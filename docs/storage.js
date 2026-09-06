@@ -1,0 +1,14 @@
+/* Scoped to this project path. Never read/write Cultura365 storage or caches. */
+(function(){'use strict';
+const path=location.protocol==='file:'?'offline':location.pathname.replace(/[^/]*$/,'');
+const NS='mir2027:0.1:'+path,KEY=NS+':state',DB=NS+':db';let dbPromise;
+const idb=()=>dbPromise||(dbPromise=new Promise((res,rej)=>{if(!window.indexedDB)return rej(new Error('Este navegador no permite IndexedDB.'));const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>r.result.createObjectStore('data');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}));
+async function get(k){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction('data','readonly'),r=t.objectStore('data').get(k);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function put(k,v){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction('data','readwrite');t.objectStore('data').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('Guardado cancelado'));});}
+function loadState(){try{const raw=localStorage.getItem(KEY);if(!raw)return MIRCore.blankState();const s=JSON.parse(raw);if(s.schema!=='mir2027.state.v1')throw new Error('Versión de historial incompatible.');return Object.assign(MIRCore.blankState(),s);}catch(e){throw new Error('No se pudo abrir el historial local. No se ha borrado: '+e.message);}}
+function saveState(s){const current=localStorage.getItem(KEY);if(current){const existing=JSON.parse(current);if(existing.revision>s.revision)throw new Error('Otra pestaña ha actualizado el historial. Recarga esta pestaña antes de continuar para no sobrescribirlo.');}s.revision++;s.updatedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(s));}catch(e){s.revision--;throw new Error('No hay espacio o permiso para guardar el historial. Exporta una copia antes de cerrar. '+e.message);}return true;}
+function validateState(s){if(!s||s.schema!=='mir2027.state.v1'||!Array.isArray(s.attempts)||!s.sessions||typeof s.sessions!=='object')throw new Error('Copia de seguridad no compatible.');const ids=new Set();for(const a of s.attempts){if(!a||typeof a.id!=='string'||ids.has(a.id))throw new Error('Intentos duplicados o inválidos.');ids.add(a.id);}return true;}
+function replaceState(s){validateState(s);s=MIRCore.clone(s);s.revision=loadState().revision;saveState(s);return s;}
+function download(name,text,type='application/json'){const url=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+window.MIRStore={NS,KEY,get,put,loadState,saveState,validateState,replaceState,download};
+})();
