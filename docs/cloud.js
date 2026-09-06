@@ -1,0 +1,26 @@
+(()=>{'use strict';
+const URL='https://baplujcmcrqnjyarkere.supabase.co';
+const KEY='sb_publishable_Gj5hyMV4ovSFdBUNp2p0nQ_J_ja4PV_';
+const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+let saveQueue=Promise.resolve();
+const one=(r)=>{if(r.error)throw r.error;return r.data};
+function qmap(q){return {id:q.external_id||q.id,kind:'question',origin:q.origin,status:q.status,subject:q.subject,topic:q.topic,concept:q.concept,stem:q.stem,options:q.options,answer:q.correct_index,explanation:q.explanation,optionExplanations:q.option_explanations||[],takeaway:q.takeaway,commentary:q.commentary,references:q.references_json||[],reviewDate:q.review_date,priority:q.priority_2027,priorityReason:q.priority_reason,year:q.official_year,number:q.official_number,officialVerified:q.official_verified,imageRequired:q.image_required,image:q.image_path||null};}
+function fmap(f){return {id:f.external_id||f.id,kind:'flashcard',subject:f.subject,topic:f.topic,concept:f.concept,front:f.front,back:f.back,reviewDate:f.review_date};}
+function rmap(r){return {id:r.external_id||r.id,kind:'reading',subject:r.subject,topic:r.topic,concept:r.concept,title:r.title,sections:Array.isArray(r.body)?r.body:[],reviewDate:r.review_date};}
+function amap(a){return {id:a.external_id||a.id,kind:'atlas',subject:a.subject,topic:a.topic,concept:a.topic,title:a.title,prompt:a.prompt,imageAlt:a.image_alt,type:a.item_type,warning:a.warning,image:a.image_path||null,description:a.description||null};}
+async function getSession(){return (await client.auth.getSession()).data.session||null;}
+async function signIn(email){const redirectTo=location.origin+location.pathname;const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:redirectTo,shouldCreateUser:true}});if(error)throw error;return true;}
+async function signOut(){const {error}=await client.auth.signOut();if(error)throw error;}
+async function membership(){const {data,error}=await client.from('app_members').select('role,approved_at').maybeSingle();if(error)throw error;return data||null;}
+async function claimInvite(code){const {data,error}=await client.rpc('claim_app_invite',{invite_code:String(code||'').trim()});if(error)throw error;return data===true;}
+async function loadBank(){const [qs,fs,rs,as,ss]=await Promise.all([
+ client.from('questions').select('*').order('official_year',{ascending:false,nullsFirst:false}),
+ client.from('flashcards').select('*'),client.from('readings').select('*'),client.from('atlas_items').select('*'),client.from('sources').select('*')]);
+ [qs,fs,rs,as,ss].forEach(x=>{if(x.error)throw x.error});
+ return {schema:'mir2027.bank.v1',version:'cloud-1',questions:(qs.data||[]).map(qmap),flashcards:(fs.data||[]).map(fmap),readings:(rs.data||[]).map(rmap),atlas:(as.data||[]).map(amap),sources:(ss.data||[]).map(s=>({id:s.external_id||s.id,title:s.title,role:s.source_type,edition:s.edition,notes:s.notes,file:s.file_name,pages:s.pages,sha256:s.sha256}))};}
+async function loadState(userId){const {data,error}=await client.from('user_state').select('state,revision').eq('user_id',userId).maybeSingle();if(error)throw error;const blank=MIRCore.blankState();if(!data||!data.state||Object.keys(data.state).length===0)return blank;return Object.assign(blank,data.state,{revision:Number(data.revision||data.state.revision||0)});}
+function saveState(userId,state){state.revision=(state.revision||0)+1;state.updatedAt=Date.now();const payload=JSON.parse(JSON.stringify(state));saveQueue=saveQueue.then(async()=>{const {error}=await client.from('user_state').upsert({user_id:userId,state:payload,revision:payload.revision,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error)throw error;return true;});return saveQueue;}
+async function syncAttempt(userId,attempt,sessionIdMap={}){if(!attempt||attempt.kind!=='question')return;const {data:q}=await client.from('questions').select('id').eq('external_id',attempt.itemId).maybeSingle();if(!q?.id)return;const row={user_id:userId,question_id:q.id,selected_index:attempt.selected,correct:attempt.correct,confidence:attempt.confidence,used_help:!!attempt.help,seconds_spent:attempt.seconds||0,attempt_number:attempt.first?1:2,created_at:new Date(attempt.at||Date.now()).toISOString()};const {error}=await client.from('attempts').insert(row);if(error&&error.code!=='23505')console.warn('attempt sync',error.message);}
+async function cloudStats(userId){const {data,error}=await client.from('attempts').select('correct,confidence,used_help,attempt_number,created_at').eq('user_id',userId);if(error)throw error;return data||[];}
+window.MIRCloud={client,getSession,signIn,signOut,membership,claimInvite,loadBank,loadState,saveState,syncAttempt,cloudStats,URL};
+})();
