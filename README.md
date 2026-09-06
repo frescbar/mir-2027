@@ -2,22 +2,32 @@
 
 Proyecto personal e independiente de `cultura365` para preparación MIR.
 
-## Estado
+## Arquitectura
 
-Primera versión funcional: sesión diaria, preguntas, tarjetas, microlecturas, temas, repaso, atlas, simulacros, estadísticas, biblioteca privada e impresión.
+- **Frontend** en `/docs`.
+- **Supabase Auth** para acceso personal.
+- **PostgreSQL + RLS** para banco privado, membresía y progreso.
+- **Estado sincronizado** entre dispositivos mediante `user_state`.
+- El repositorio no contiene los PDF originales ni imágenes extraídas de libros.
+
+## Funciones actuales
+
+Sesión diaria adaptativa de 10 actividades, preguntas, tarjetas, microlecturas, práctica por temas, repaso de errores, atlas con trazabilidad, bloques de simulacro, estadísticas e impresión de sesiones.
+
+La selección diaria prioriza repaso vencido y errores previos, mantiene preguntas nuevas y usa repetición espaciada sencilla. Los primeros intentos se separan de las repeticiones en las estadísticas.
 
 ## Privacidad y derechos
 
-Este repositorio **no contiene los PDFs aportados ni el banco privado derivado de ellos**. El material personal se importa desde el navegador y se guarda de forma local. No subir libros, claves, datos clínicos ni material protegido al repositorio.
+El cliente usa únicamente la clave **publicable** de Supabase. El contenido se protege con autenticación, lista privada de miembros y Row Level Security. No deben añadirse al repositorio libros, claves secretas, datos clínicos ni copias del material protegido.
 
-## Publicación
+## Contenido
 
-La web está en `/docs`. Para un enlace web se puede desplegar esa carpeta en GitHub Pages o en otro hosting estático. El repositorio se creó privado deliberadamente.
+El banco inicial es un piloto revisado y trazable. La extracción histórica no revisada permanece fuera de producción. Las frecuencias históricas, recomendaciones editoriales y rendimiento personal son señales distintas; la aplicación no presenta porcentajes de probabilidad MIR 2027 sin validación.
 
 ## Separación
 
-No comparte código, almacenamiento ni datos con Cultura365. La clave local comienza por `mir2027:`.
+No comparte repositorio, base de datos, almacenamiento ni progreso con Cultura365.
 
-## Limitaciones actuales
+## Pendiente antes de producción estable
 
-La sincronización entre dispositivos, correo diario y banco MIR 2026 cotejado aún no están activados. Las prioridades 2027 deben basarse en análisis documentado, no en porcentajes inventados.
+Despliegue final en hosting compatible con repositorio privado, configuración del dominio de retorno de Supabase Auth, ampliación y cotejo del banco oficial —incluido MIR 2026— e incorporación segura de imágenes permitidas.
