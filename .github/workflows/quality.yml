@@ -1,0 +1,25 @@
+name: MIR 2027 quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check JavaScript syntax
+        run: |
+          node --check docs/core.js
+          node --check docs/cloud.js
+          node --check docs/app.js
+          node --check docs/print.js
+      - name: Check protected content is absent
+        run: |
+          test ! -e "979623535-LIBRO-GORDO-MIR-2016-2025.pdf"
+          ! find . -type f \( -name '*.pdf' -o -name '*banco_personal*' \) | grep -q .
