@@ -1,42 +1,51 @@
-# Verificación de MIR/27 1.1
+# Verificación de MIR/27 1.2
 
 Fecha: 9 de septiembre de 2026. Aplicación: https://mir-2027.vercel.app/.
 
-## Contenido incorporado
+## Contenido y cambios documentales
 
-| Contenido | Corpus importado | Total conservado en la web |
+| Contenido | Corpus privado | Total conservado en la web |
 | --- | ---: | ---: |
-| Preguntas | 3.241 | 3.250 |
+| Registros de preguntas | 3.241 | 3.250 |
+| Preguntas habilitadas | 2.912 | 2.921 |
+| Fichas pendientes | 196 | 196 |
+| Versiones agrupadas | 133 | 133 |
 | Lecturas | 621 | 621 |
 | Tarjetas | 202 | 202 |
-| Fichas de atlas | 221 | 221 |
-| Imágenes | 221 | 221 |
+| Imágenes | 899 | 899 |
 | Temas | 324 | 324 |
 | Fuentes | 25 | 26 |
 
-Se completaron 50 de 50 lotes con validación SHA-256 de cada carga, sin rechazos. Los identificadores de temas se alinearon con los que utiliza el cliente para evitar duplicados en una incorporación posterior. Se conservaron nueve preguntas y una fuente de la versión previa que no estaban en el corpus incorporado.
+Se reextrajeron 51 enunciados del PDF de 2015 eliminando glifos superpuestos, sin cambiar ninguna clave. Las imágenes de PDF divididas en tiras se recompusieron mediante sus posiciones. Se separaron regiones anteriores y posteriores a la solución, conservando página y coordenadas. Se inspeccionaron visualmente casos de 2010, 2015, 2018, 2021 y 2022; esto es un muestreo, no inspección clínica individual de las 899 imágenes.
 
-Comparación final entre el archivo preparado y la base de datos:
+Se vincularon imágenes entre versiones únicamente con enunciado normalizado, opciones y clave documental coincidentes. Las referencias secundarias ya consolidadas requieren opciones y clave compatibles. Las 133 versiones agrupadas conservan sus fichas, fuentes e historial: sus equivalencias se aplican al seleccionar repasos y reconocer intentos anteriores.
 
-- Preguntas del corpus: MD5 agregado de identificador, enunciado, clave, opciones ordenadas y comentario: `e0769b892e7b17589a206bef0455621c`.
-- Imágenes: MD5 agregado de identificador y contenido: `5c991793e0cc60f2c790b688233f2f04`.
-- Ambas comparaciones coinciden. Las 221 imágenes se decodificaron correctamente en la verificación local; ninguna referencia de imagen queda sin resolver en la web.
-- El estado y la revisión del progreso existente son idénticos antes y después de la importación y de las comprobaciones.
+Hay extractos literales por alternativa en 2.436 preguntas. La correspondencia usa el texto de la opción de cada fuente, por lo que un orden diferente no cambia su destino. Cuando una fuente no explica una alternativa por separado, la interfaz lo dice expresamente. Se conservan los comentarios completos.
 
-## Funcionamiento y acceso
+## Incorporación y preservación
 
-Ocho pruebas de motor e interfaz pasaron con datos sintéticos y con el corpus privado preparado: tamaño diario, exclusiones, copia del contenido de las sesiones, corrección, simulacros, combinación y persistencia de progreso, paginación de lecturas e impresión. Las pruebas de interfaz utilizan DOM simulado e IndexedDB de prueba.
+Se completaron 88 lotes: 678 medios nuevos y actualizaciones de las 3.241 preguntas. Las modificaciones fusionan solo los campos cambiados y exigen coincidencia con sus valores anteriores o con el resultado ya aplicado. No se eliminó contenido previo ni se reabrió la función temporal de carga anónima.
 
-Se comprobó en la base de datos que el rol autenticado de un miembro puede leer el banco completo, guardar su propio progreso y detectar una revisión obsoleta. Un usuario autenticado sin membresía no puede leer el contenido ni guardar progreso. Las escrituras de comprobación se revirtieron en la misma transacción. No se crearon cuentas ni sesiones nuevas.
+- Las 899 imágenes se decodificaron y coinciden por MD5 agregado de identificador y contenido: `0a008fe791e3129505b0c79a805a8d29`.
+- Todas las referencias a imágenes de preguntas y explicaciones resuelven en la base de datos.
+- Las claves de todas las preguntas coinciden con la copia anterior.
+- El resumen del progreso antes y después de esta incorporación coincide: no se modificó el historial del usuario.
+- El atlas se deriva del banco: 309 fichas visuales del corpus sin versiones agrupadas. Se conservan los 221 registros de atlas anteriores por compatibilidad.
 
-Las peticiones HTTP sin iniciar sesión no devolvieron contenido ni progreso. Después se retiraron los permisos anónimos restantes, los permisos de operaciones destructivas de los clientes y la ejecución de la función temporal de transferencia. El trabajo de transferencia quedó expirado y completado.
+## Funcionamiento
 
-La web publicada muestra correctamente el formulario de acceso de la versión 1.1. La comprobación pendiente del usuario es entrar con su cuenta y revisar la experiencia real en su navegador; no se afirma haber realizado ese inicio de sesión.
+Las 22 pruebas automatizadas pasan con datos sintéticos y con el corpus privado. Cubren sesiones y claves congeladas, corrección con opciones mezcladas, exclusiones, simulacros, intervalos, equivalencias, lectura, impresión, recuperación de contraseña, almacenamiento y sincronización.
 
-## Límites y ajustes pendientes
+El recorrido sin conexión se verifica con IndexedDB de prueba y respuestas HTTP simuladas: descargar una sesión con sus imágenes, recrear la página sin red, responder y anotar, volver a recrearla, y sincronizar ante un conflicto con cambios de otro dispositivo. Se conservan ambos intentos, notas y favorita. Una descarga incompleta conserva la anterior. Otra cuenta no accede a esa descarga, salir la elimina y una membresía revocada con red no activa la alternativa sin conexión.
 
-Hay 2.841 preguntas habilitadas (2.832 del corpus y nueve conservadas) y 409 apartadas por problemas de extracción, claves o imágenes. La validación estructural no sustituye una revisión clínica de todas las fuentes históricas.
+El service worker se prueba de forma aislada: ofrece la interfaz cuando falla la red y no intercepta Supabase ni archivos privados arbitrarios. Las tres copias de seguridad son locales al navegador, con exportación manual; limpiar sus datos puede eliminarlas. Para estudiar sin conexión hay que descargar primero la sesión en ese mismo navegador.
 
-El banco y el progreso requieren acceso de miembro. El repositorio de código sigue público a la fecha de esta revisión: cambiar su visibilidad requiere una acción del propietario en [los ajustes de GitHub](https://github.com/frescbar/mir-2027/settings). El repositorio no contiene el corpus privado.
+La recuperación vuelve correctamente al dominio publicado tras el ajuste del propietario. Las cuatro pruebas de recuperación no envían correos reales ni cambian la cuenta.
 
-El asesor de seguridad de Supabase mantiene dos avisos: la función de canje de invitaciones usa intencionadamente privilegios elevados y valida la identidad y el código de invitación ([referencia](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)); la comprobación de contraseñas filtradas está desactivada ([ajuste de Auth](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection)). Estos avisos no se presentan como resueltos.
+Estas comprobaciones no equivalen a iniciar sesión con la cuenta del propietario ni a completar una prueba real de modo avión en su móvil. La revisión final del usuario es abrir la web, estudiar y comprobar la descarga en su navegador habitual.
+
+## Límites conservados
+
+Las 196 fichas pendientes siguen excluidas: 119 necesitan imagen y 77 requieren revisión. Las fuentes son históricas; no se declara revisión clínica vigente de todo el banco ni validación oficial ministerial. La adaptación del repaso es una regla de estudio, no una predicción de resultado MIR.
+
+El banco y el progreso requieren membresía. El repositorio de código seguía público al comprobarlo en esta revisión; no contiene el corpus privado. Cambiar su visibilidad requiere el propietario. Los dos avisos de Supabase documentados en la revisión anterior no se presentan como resueltos: la función restringida de invitaciones con privilegios elevados y la protección de contraseñas filtradas desactivada.

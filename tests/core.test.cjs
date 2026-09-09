@@ -34,3 +34,18 @@ test('merging device progress preserves distinct attempts and newer note edits',
  a.marks.q1={value:true,at:1};b.marks.q1={value:false,at:2};
  const m=C.merge(a,b);assert.equal(m.attempts.length,2);assert.equal(m.notes.q1.text,'new');assert.equal(m.marks.q1.value,false);
 });
+test('errors are recalled when due, and guessed correct answers return the next day',()=>{
+ const s=C.blank(),one={...bank,questions:[q('q1')]};
+ let session=C.makeSession(one,s,[{id:'q1',kind:'question'}]);C.answer(s,session,0,{selected:0,confidence:'sure'},()=>null);
+ assert.equal(C.selectQuestions(one,s,10,'now').length,0);
+ s.schedule.q1.dueAt=Date.now()-1;assert.equal(C.selectQuestions(one,s,10,'later').length,1);
+ session=C.makeSession(one,s,[{id:'q1',kind:'question'}]);C.answer(s,session,0,{selected:3,confidence:'guess'},()=>null);
+ assert.equal(s.schedule.q1.intervalDays,1);assert.equal(s.schedule.q1.streak,0);
+ for(const days of [3,7,14]){session=C.makeSession(one,s,[{id:'q1',kind:'question'}]);C.answer(s,session,0,{selected:3,confidence:'sure'},()=>null);assert.equal(s.schedule.q1.intervalDays,days);}
+});
+test('a consolidated documentary version retains the previous version’s learning history',()=>{
+ const s=C.blank(),canonical={...q('canonical'),equivalentIds:['old'],family:'same'},old={...q('old'),duplicateOf:'canonical',family:'same',eligible:false},b={...bank,questions:[canonical,old]};
+ s.attempts=[{id:'past',itemId:'old',kind:'question',correct:false,confidence:'sure',at:Date.now()}];s.schedule.old={lastAt:Date.now(),dueAt:Date.now()+C.DAY,intervalDays:1};
+ assert.equal(C.selectQuestions(b,s,10,'today').length,0);s.schedule.old.dueAt=Date.now()-1;assert.equal(C.selectQuestions(b,s,10,'later')[0].id,'canonical');
+ const session=C.makeSession(b,s,[{id:'canonical',kind:'question'}]);C.answer(s,session,0,{selected:3,confidence:'sure'},()=>null);assert.equal(s.attempts[1].first,false);assert.equal(s.attempts[0].itemId,'old');
+});

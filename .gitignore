@@ -7,3 +7,6 @@ bank*.json
 MIR27*.html
 transfer-private.json
 *.pdf
+
+__pycache__/
+*.pyc

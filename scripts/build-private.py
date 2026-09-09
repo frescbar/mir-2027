@@ -11,7 +11,7 @@ html=re.sub(r'<link rel="stylesheet"[^>]+>',lambda _: '<style>'+css+'</style>',h
 html=re.sub(r'<link rel="(?:icon|manifest)"[^>]+>','',html)
 payload=json.dumps(bank,ensure_ascii=False,separators=(',',':')).replace('<','\\u003c').replace('\u2028','\\u2028').replace('\u2029','\\u2029')
 inline='<script id="mir-private-bank" type="application/json">'+payload+'</script><script>window.MIR_PRIVATE_BANK=JSON.parse(document.getElementById("mir-private-bank").textContent);</script>'
-html=html.replace('<script src="./core-v1.js?v=1.1.0">',inline+'<script src="./core-v1.js?v=1.1.0">')
+html=re.sub(r'(?=<script src="\./core-v1\.js\?)',lambda _:inline,html,count=1)
 html=re.sub(r'<script src="\./([^?]+)\?[^\"]+"></script>',lambda m:'<script>'+(ROOT/'docs'/m[1]).read_text()+'</script>',html)
 Path(sys.argv[2]).write_text(html)
 print(json.dumps({'file':str(Path(sys.argv[2]).resolve()),'bytes':len(html.encode()),'questions':len(bank['questions'])}))

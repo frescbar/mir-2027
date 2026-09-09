@@ -2,7 +2,7 @@
 
 Proyecto independiente de Cultura365. La web está en `https://mir-2027.vercel.app` y su raíz de despliegue es `docs`.
 
-## Versión 1.1
+## Versión 1.2
 
 Banco buscable por texto, asignatura, año y estado; comentarios de las fuentes con página; preguntas históricas de cuatro o cinco opciones; imágenes privadas ampliables; diez preguntas diarias por defecto y tamaño configurable de 5 a 50; modo mixto opcional; repasos, notas, favoritas, estadísticas; simulacros cronometrados con corrección al entregar; cuadernos A4 mediante impresión del navegador.
 
@@ -10,17 +10,27 @@ Las sesiones nuevas conservan una copia del contenido usado para que una actuali
 
 La versión 1.1.1 incorpora «He olvidado mi contraseña», solicitud de enlace por correo y formulario para elegir una contraseña nueva. El retorno valida la sesión con Supabase, retira los tokens de la dirección y permite volver a iniciar sesión sin modificar el progreso. La configuración del destino de los correos se detalla en [recuperación de acceso](ops/ACCESS_RECOVERY.md).
 
+### Novedades de la versión 1.2
+
+- Sesión descargable con preguntas, comentarios e imágenes. El service worker guarda la interfaz; IndexedDB conserva únicamente la descarga solicitada y los avances de la cuenta. Al recuperar conexión se combinan los cambios mediante revisión de servidor. Salir de la cuenta elimina su descarga y copias locales; el progreso todavía pendiente se retiene para la misma cuenta.
+- Tres copias recientes de progreso en el navegador: una automática al guardar, como máximo una al día, y una antes de importar avances. Pueden descargarse desde Biblioteca y copias. No sustituyen una copia exportada fuera del navegador.
+- Repaso según fecha, seguridad, errores recientes y materia. Un error no vuelve automáticamente antes de cumplir su intervalo; una respuesta acertada al azar vuelve al día siguiente. Las reglas no predicen una nota MIR.
+- Alternativas con extractos literales de sus comentarios, vinculados por el texto de la opción. La falta de explicación individual queda visible. Las imágenes explicativas aparecen después de responder.
+- Controles táctiles, barra de avance en móvil y ampliación de imágenes. Las fichas pendientes se abren como referencias sin puntuar.
+
 ### Estado del contenido a 9 de septiembre de 2026
 
-La copia privada preparada contiene 3.241 preguntas, 621 lecturas, 202 tarjetas y 221 imágenes. Tras detectar errores de extracción, 2.832 preguntas quedan habilitadas y 409 apartadas de la selección automática. El filtrado es estructural, no una revisión clínica.
+La web conserva 3.250 registros de preguntas: 2.921 habilitados, 196 pendientes y 133 versiones documentales agrupadas. Mantiene las nueve preguntas previas, 621 lecturas, 202 tarjetas, 324 temas y 26 fuentes. El archivo privado contiene las 3.241 preguntas del corpus revisado documentalmente.
 
-La incorporación autorizada a Supabase se completó: 50 lotes, 4.856 registros procesados y ninguno rechazado. La web contiene 3.250 preguntas (3.241 del corpus y 9 previas conservadas), 621 lecturas, 202 tarjetas, 221 fichas de atlas con imagen, 221 imágenes, 324 temas y 26 fuentes. Hay 2.841 preguntas habilitadas para practicar y 409 apartadas de la selección automática.
+Se recuperaron 51 enunciados del PDF de 2015 sin cambiar sus claves, se reconstruyeron fotografías divididas en tiras y se incorporaron 678 recursos visuales, para un total de 899 imágenes. El atlas se genera a partir de las preguntas: 309 fichas visuales del corpus sin versiones agrupadas. Hay extractos por alternativa en 2.436 preguntas; no se afirma que todas las alternativas tengan explicación individual.
 
-Se verificó por hash que los enunciados, opciones, claves y comentarios importados coinciden con el archivo preparado y que las 221 imágenes coinciden íntegramente. No quedan referencias a imágenes inexistentes. El progreso anterior sigue idéntico; se comprobaron la lectura autorizada, el guardado y los conflictos de revisión en una transacción revertida. La vía temporal de carga quedó cerrada. Véase [el registro de verificación](ops/VERIFICATION.md).
+La incorporación utilizó 88 lotes con actualizaciones de contenido condicionadas a su versión anterior, conservando los campos ajenos al cambio. Las 899 imágenes coinciden por hash con la copia preparada y no hay referencias de imagen sin resolver. El progreso anterior y posterior a la actualización es idéntico. Véase [el registro de verificación](ops/VERIFICATION.md).
 
 ### Verificación reproducible
 
 `npm ci && npm test` ejecuta las pruebas del motor y de la interfaz en DOM simulado, con datos sintéticos y almacenamiento IndexedDB de prueba. No envía datos ni modifica la cuenta del usuario. Para comprobar también un banco privado local: `MIR_TEST_BANK=/ruta/fuera/del/repositorio/bank.json npm test`.
+
+`python3 scripts/verify-bank.py BANCO.json --baseline BANCO_ANTERIOR.json` comprueba claves, exclusiones, referencias, imágenes y literalidad de los extractos.
 
 `python3 scripts/prepare-bank.py ENTRADA.json SALIDA.json` normaliza etiquetas y aparta extracciones anómalas sin inventar contenido clínico. `python3 scripts/build-private.py BANCO.json SALIDA.html` crea una copia autocontenida. Las entradas y salidas privadas deben permanecer fuera del repositorio.
 
@@ -29,7 +39,8 @@ Las funciones se han probado con un corpus documental privado mediante pruebas u
 ## Arquitectura
 
 - `core-v1.js`: selección, sesiones, corrección, intervalos y combinación de progreso.
-- `store-v1.js`: Supabase Auth/REST, banco paginado, imágenes bajo demanda y guardado con detección de conflictos.
+- `store-v1.js`: Supabase Auth/REST, banco paginado, imágenes bajo demanda, descarga privada y guardado con detección de conflictos.
+- `sw.js` y `offline-v1.js`: acceso sin conexión a la interfaz, sin almacenar respuestas de Supabase en la caché de red.
 - `app-v1.js`: interfaz y transferencia autorizada del paquete privado.
 - `print-v1.js`: cuadernos de preguntas y comentarios, sin exponer soluciones antes de entregar un examen.
 - `mir_content` y `mir_media`: contenido documental privado con RLS y acceso de miembros.
