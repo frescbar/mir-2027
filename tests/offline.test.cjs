@@ -81,6 +81,24 @@ test('a revoked membership online is not treated as a network outage',async()=>{
  const db=new IDBFactory(),remote=server(),app=boot(db,remote);await prepare(app);
  try{app.w.fetch=async()=>new Response('[]');await assert.rejects(()=>app.S.init(),/no tiene acceso autorizado/);assert.equal(app.S.offline,false);}finally{app.close();}
 });
+test('unscored study, its review date and optional preference survive offline reload and synchronization',async()=>{
+ const db=new IDBFactory(),remote=server();let app=boot(db,remote);await app.S.init();let state=await app.S.loadState();
+ const question={...bank.questions[0],isAnnulled:true,answer:null},content={...bank,questions:[question]},session=C.makeSession(content,state,[{id:'q',kind:'question'}],{id:'unscored-offline'});
+ state.sessions[session.id]=session;state.activeSession=session.id;state.preferences.includeObservations=true;state=await app.S.saveState(state);await app.S.prepareOffline(content,state,session.id);app.close();app=boot(db,remote,{online:false});
+ try{
+  await app.S.init();state=await app.S.loadState();C.answer(state,state.sessions[session.id],0,{selected:1,confidence:'sure'},()=>null);state=await app.S.saveState(state);app.close();app=boot(db,remote,{online:false});await app.S.init();state=await app.S.loadState();
+  assert.equal(state.attempts[0].scored,false);assert.equal(state.attempts[0].correct,null);assert.equal(state.studySchedule.q.intervalDays,7);assert.equal(state.preferences.includeObservations,true);assert.equal(C.stats(state).first.total,0);
+  app.setOnline(true);await app.S.reconnect();await app.S.saveState(state);assert.equal(remote.state.studySchedule.q.intervalDays,7);assert.equal(remote.state.attempts[0].scored,false);
+ }finally{app.close();}
+});
+test('cloud image catalog requests metadata only and keeps binary image data on demand',async()=>{
+ const app=boot(new IDBFactory(),server());try{
+  await app.S.init();let call;
+  app.w.fetch=async url=>{call=new URL(url);return new Response(JSON.stringify([{external_id:'photo',title:'Source photograph',sourceId:'document',pdfPage:7}]));};
+  const catalog=await app.S.mediaCatalog();assert.equal(catalog[0].id,'photo');assert.equal(catalog[0].pdfPage,7);assert.equal(catalog[0].data,undefined);
+  assert.equal(call.searchParams.get('order'),'external_id');assert.match(call.searchParams.get('select'),/title:data->>title/);assert.ok(!call.searchParams.get('select').split(',').includes('data'));
+ }finally{app.close();}
+});
 test('service worker serves its offline shell and never intercepts cloud data',async()=>{
  const handlers={},cached={shell:true};let claimed=false;
  const cache={match:async key=>key==='/index.html'?cached:null,addAll:async()=>{}};
@@ -90,4 +108,9 @@ test('service worker serves its offline shell and never intercepts cloud data',a
  handlers.fetch({request:{url:'https://mir-2027.vercel.app/private-bank.json',method:'GET'},respondWith:p=>{response=p;}});assert.equal(response,undefined);
  handlers.fetch({request:{url:'https://mir-2027.vercel.app/',method:'GET',mode:'navigate'},respondWith:p=>{response=p;}});assert.equal(await response,cached);
  let activation;handlers.activate({waitUntil:p=>{activation=p;}});await activation;assert.equal(claimed,true);
+});
+test('service worker never serves an old script for a new version query',async()=>{
+ const handlers={},fresh={version:'future'},requested=[];
+ vm.runInNewContext(fs.readFileSync(path.join(root,'sw.js'),'utf8'),{URL,Response,Set,Promise,self:{location:{origin:'https://mir-2027.vercel.app'},addEventListener:(name,fn)=>handlers[name]=fn},caches:{open:async()=>({match:async(request,options)=>{assert.equal(options?.ignoreSearch,undefined);return null;}})},fetch:async request=>{requested.push(request.url);return fresh;}});
+ let response;handlers.fetch({request:{url:'https://mir-2027.vercel.app/core-v1.js?v=future',method:'GET'},respondWith:p=>{response=p;}});assert.equal(await response,fresh);assert.equal(requested.length,1);
 });

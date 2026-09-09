@@ -49,3 +49,34 @@ test('a consolidated documentary version retains the previous version’s learni
  assert.equal(C.selectQuestions(b,s,10,'today').length,0);s.schedule.old.dueAt=Date.now()-1;assert.equal(C.selectQuestions(b,s,10,'later')[0].id,'canonical');
  const session=C.makeSession(b,s,[{id:'canonical',kind:'question'}]);C.answer(s,session,0,{selected:3,confidence:'sure'},()=>null);assert.equal(s.attempts[1].first,false);assert.equal(s.attempts[0].itemId,'old');
 });
+test('all documentary questions can be studied while unscored attempts do not change accuracy or errors',()=>{
+ const s=C.blank(),bad={...q('bad'),answer:null,isAnnulled:true,status:'requiere_revision',eligible:false},b={...bank,questions:[bad]};
+ assert.equal(C.studyable(bad),true);assert.equal(C.eligible(bad),false);
+ s.schedule.bad={dueAt:123,lastAt:10};const before=structuredClone(s.schedule);
+ const session=C.makeSession(b,s,[{id:'bad',kind:'question'}]);C.answer(s,session,0,{selected:1,confidence:'sure'},()=>null);
+ assert.equal(s.attempts[0].scored,false);assert.equal(s.attempts[0].correct,null);assert.equal(s.attempts[0].blank,false);
+ assert.equal(C.stats(s,b).first.total,0);assert.equal(C.stats(s,b).confidentErrors,0);assert.equal(C.stats(s,b).unresolved,0);assert.equal(C.stats(s,b).observations,1);assert.equal(C.latest(s,b).size,0);
+ assert.deepEqual(s.schedule,before);assert.equal(s.studySchedule.bad.intervalDays,7);
+ assert.equal(C.merge(s,C.blank()).studySchedule.bad.dueAt,s.studySchedule.bad.dueAt);
+});
+test('daily routine stays unchanged unless observations are enabled, and their review interval is respected',()=>{
+ const s=C.blank(),questions=Array.from({length:10},(_,i)=>({...q('bad'+i),eligible:false,status:'imagen_pendiente',imageRequired:true})),b={...bank,questions};
+ assert.equal(C.selectDaily(b,s,'day',5).length,0);s.preferences.includeObservations=true;
+ const selected=C.selectDaily(b,s,'day',5);assert.equal(selected.length,5);assert.ok(selected.every(x=>x.reason.includes('Con observaciones')));
+ const session=C.makeSession(b,s,selected);selected.forEach((_,i)=>C.answer(s,session,i,{selected:0},()=>null));
+ const onlyReviewed={...b,questions:questions.filter(q=>selected.some(x=>x.id===q.id))};assert.equal(C.selectQuestions(onlyReviewed,s,5,'tomorrow').length,0);
+ Object.values(s.studySchedule).forEach(p=>p.dueAt=Date.now()-1);assert.equal(C.selectQuestions(onlyReviewed,s,5,'week').length,5);
+});
+test('exam scoring excludes annulled, disputed, incomplete and missing-image questions',()=>{
+ const reliable=q('ok'),unscored=[{...q('annulled'),isAnnulled:true},{...q('conflict'),sourceDiscrepancy:true},{...q('image'),imageRequired:true,images:[]},{...q('key'),answer:null},{...q('challenged'),isChallenged:true}];
+ const b={...bank,questions:[reliable,...unscored]},s=C.blank(),session=C.makeSession(b,s,b.questions.map(x=>({id:x.id,kind:'question'})),{mode:'exam'});
+ C.answer(s,session,0,{selected:3},()=>null);C.answer(s,session,1,{selected:3},()=>null);C.finish(s,session,()=>null);
+ assert.deepEqual(C.score(session),{correct:1,wrong:0,blank:0,total:1,raw:3,net:1});assert.equal(C.stats(s).first.total,1);assert.equal(C.stats(s).observations,5);
+ assert.ok(C.observations(unscored[4]).some(x=>x.code==='challenged'));assert.ok(!C.observations(unscored[4]).some(x=>x.code==='annulled'));
+});
+test('old sessions and historical attempts retain their content and scoring after the update',()=>{
+ const s=C.blank(),b=structuredClone(bank),session=C.makeSession(b,s,[{id:'q1',kind:'question'}]);delete session.items[0].scored;delete session.items[0].observationSnapshot;
+ b.questions[1].eligible=false;b.questions[1].isAnnulled=true;
+ C.answer(s,session,0,{selected:session.items[0].answerKey},()=>b.questions[1]);assert.equal(s.attempts[0].correct,true);
+ delete s.attempts[0].scored;assert.equal(C.stats(s).first.correct,1);assert.equal(C.score(session).correct,1);
+});

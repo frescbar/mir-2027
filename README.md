@@ -2,7 +2,7 @@
 
 Proyecto independiente de Cultura365. La web está en `https://mir-2027.vercel.app` y su raíz de despliegue es `docs`.
 
-## Versión 1.2
+## Versión 1.3
 
 Banco buscable por texto, asignatura, año y estado; comentarios de las fuentes con página; preguntas históricas de cuatro o cinco opciones; imágenes privadas ampliables; diez preguntas diarias por defecto y tamaño configurable de 5 a 50; modo mixto opcional; repasos, notas, favoritas, estadísticas; simulacros cronometrados con corrección al entregar; cuadernos A4 mediante impresión del navegador.
 
@@ -10,17 +10,27 @@ Las sesiones nuevas conservan una copia del contenido usado para que una actuali
 
 La versión 1.1.1 incorpora «He olvidado mi contraseña», solicitud de enlace por correo y formulario para elegir una contraseña nueva. El retorno valida la sesión con Supabase, retira los tokens de la dirección y permite volver a iniciar sesión sin modificar el progreso. La configuración del destino de los correos se detalla en [recuperación de acceso](ops/ACCESS_RECOVERY.md).
 
+### Ampliación de la versión 1.3
+
+Las **3.250 preguntas de la web** están disponibles para responder y estudiar. El banco abre con «Todas» y permite filtrar «Sin incidencias» o «Con observaciones». Los bloques de esa selección y los cuadernos impresos incluyen las preguntas elegidas, también si tienen incidencias.
+
+La rutina habitual se conserva: diez preguntas por defecto, tamaño configurable, respuesta antes de explicación, repaso adaptativo y sesiones congeladas. La opción «Incluir preguntas con observaciones en mis sesiones» permite ampliar sesiones nuevas, bloques extra, temas y simulacros. Por defecto se conserva la selección anterior. Las versiones de la misma pregunta permanecen enlazadas y se agrupan en selecciones automáticas.
+
+Los intentos con observaciones se guardan con `scored: false`, sin acierto/error ni efecto en los porcentajes, primeras vueltas o netas del simulacro. Disponen de un repaso de estudio independiente a siete días. Las anuladas, las impugnaciones pendientes documentadas, los conflictos, la ausencia de imagen y los problemas de extracción se identifican explícitamente; se muestran las claves atribuidas a cada fuente sin adjudicar una respuesta en caso de discrepancia.
+
+El atlas ofrece el **catálogo completo de 899 imágenes incorporadas**, con filtros para preguntas, explicaciones y recursos conservados sin vínculo. Solo descarga metadatos al abrir el catálogo; las imágenes se cargan bajo demanda. Las imágenes no localizadas siguen señaladas en sus preguntas. No se declara que esos archivos faltantes hayan sido recuperados.
+
 ### Novedades de la versión 1.2
 
 - Sesión descargable con preguntas, comentarios e imágenes. El service worker guarda la interfaz; IndexedDB conserva únicamente la descarga solicitada y los avances de la cuenta. Al recuperar conexión se combinan los cambios mediante revisión de servidor. Salir de la cuenta elimina su descarga y copias locales; el progreso todavía pendiente se retiene para la misma cuenta.
 - Tres copias recientes de progreso en el navegador: una automática al guardar, como máximo una al día, y una antes de importar avances. Pueden descargarse desde Biblioteca y copias. No sustituyen una copia exportada fuera del navegador.
 - Repaso según fecha, seguridad, errores recientes y materia. Un error no vuelve automáticamente antes de cumplir su intervalo; una respuesta acertada al azar vuelve al día siguiente. Las reglas no predicen una nota MIR.
 - Alternativas con extractos literales de sus comentarios, vinculados por el texto de la opción. La falta de explicación individual queda visible. Las imágenes explicativas aparecen después de responder.
-- Controles táctiles, barra de avance en móvil y ampliación de imágenes. Las fichas pendientes se abren como referencias sin puntuar.
+- Controles táctiles, barra de avance en móvil y ampliación de imágenes. Las fichas con observaciones permiten responder antes de consultar su explicación, sin puntuar.
 
 ### Estado del contenido a 9 de septiembre de 2026
 
-La web conserva 3.250 registros de preguntas: 2.921 habilitados, 196 pendientes y 133 versiones documentales agrupadas. Mantiene las nueve preguntas previas, 621 lecturas, 202 tarjetas, 324 temas y 26 fuentes. El archivo privado contiene las 3.241 preguntas del corpus revisado documentalmente.
+La web conserva 3.250 preguntas accesibles: 2.921 puntuables y 329 de estudio con observaciones (196 con incidencias documentales y 133 versiones agrupadas). Mantiene las nueve preguntas previas, 621 lecturas, 202 tarjetas, 324 temas y 26 fuentes. El archivo privado contiene las 3.241 preguntas del corpus revisado documentalmente.
 
 Se recuperaron 51 enunciados del PDF de 2015 sin cambiar sus claves, se reconstruyeron fotografías divididas en tiras y se incorporaron 678 recursos visuales, para un total de 899 imágenes. El atlas se genera a partir de las preguntas: 309 fichas visuales del corpus sin versiones agrupadas. Hay extractos por alternativa en 2.436 preguntas; no se afirma que todas las alternativas tengan explicación individual.
 
@@ -66,7 +76,7 @@ El guardado local utiliza IndexedDB. Se recomienda exportar copias; el historial
 ## Límites explícitos
 
 - Comentarios históricos conservados como fuente, no como revisión clínica vigente.
-- Preguntas anuladas, con discrepancias, sin imagen necesaria o con problemas de extracción quedan fuera del entrenamiento automático.
+- Preguntas anuladas, con discrepancias, sin imagen necesaria o con problemas de extracción se pueden estudiar y añadir opcionalmente a las sesiones; sus intentos no alteran las estadísticas de aciertos.
 - Recurrencia documental y rendimiento personal no son probabilidades validadas de aparecer en MIR 2027.
 - Un bloque 200 + 10 es una simulación de entrenamiento, no el examen oficial de 2027.
 - El recordatorio diario con el enlace está configurado como automatización independiente, por la mañana en Europe/Madrid. No envía el banco ni las soluciones por correo y no requiere SMTP en la app.

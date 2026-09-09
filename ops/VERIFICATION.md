@@ -1,4 +1,36 @@
-# Verificación de MIR/27 1.2
+# Verificación de MIR/27 1.3
+
+Fecha: 9 de septiembre de 2026. Aplicación: https://mir-2027.vercel.app/.
+
+## Resultado de la ampliación
+
+- 3.250 preguntas disponibles para responder y estudiar; 2.921 puntuables y 329 con observaciones sin puntuación.
+- Las diez preguntas diarias, la selección por temas, la explicación tras responder, los repasos, las notas, las favoritas, los simulacros y el modo sin conexión siguen disponibles.
+- «Todas» es el filtro inicial del banco. La inclusión de observaciones en sesiones automáticas es una preferencia opcional y solo afecta a sesiones nuevas.
+- El atlas incluye los 899 recursos incorporados, también explicaciones y medios conservados sin pregunta vinculada. El catálogo solicita metadatos y descarga cada imagen bajo demanda.
+- Las imágenes que faltan siguen identificadas como no localizadas; no se han sustituido por imágenes generadas ni se declara su recuperación.
+
+## Comprobaciones
+
+Las 33 pruebas automatizadas cubren los recorridos anteriores y la ampliación. Entre las nuevas: responder una ficha con observaciones antes de ver su comentario; no clasificar ese intento como acierto, error o blanco; mantener estadísticas y netas; persistir preferencias y repaso de estudio; imprimir incidencias y claves divergentes; mostrar el catálogo completo; y conservar esos avances tras una descarga, cierre sin red, reapertura y sincronización.
+
+Además, se recorrieron las 3.241 preguntas del corpus privado preparado: todas permiten registrar una respuesta; 2.912 se puntúan y 329 se conservan como estudio con observaciones. Todos esos intentos sin puntuación tienen un aviso y las estadísticas resultan coherentes. Las nueve preguntas previas de la web se conservan.
+
+Las pruebas de interfaz utilizan DOM simulado e IndexedDB de prueba; las respuestas de red son simuladas. No se afirma haber iniciado sesión como el propietario ni haber completado una prueba real de modo avión en su móvil.
+
+La actualización conserva los registros de preguntas, las 899 imágenes y el progreso. Solo se actualiza el manifiesto de la versión en la base de datos; la ampliación de acceso se aplica en el cliente, sin convertir las marcas documentales de calidad en validaciones clínicas.
+
+Los intentos antiguos sin el nuevo campo `scored` siguen contando como antes. Las sesiones nuevas congelan su condición de puntuación junto al contenido. El repaso de observaciones usa `studySchedule`, independiente del calendario que registra aciertos y errores; ambos calendarios se combinan al sincronizar.
+
+La caché de la interfaz distingue versiones de los recursos. El índice detecta módulos anteriores durante una actualización, muestra el aviso de actualización y recarga al activarse la nueva versión. Una página anterior ya abierta conserva su sesión.
+
+## Límite documental
+
+El acceso a todo el banco no certifica vigencia clínica ni resuelve las incidencias de las fuentes. Anulación, impugnación pendiente y discrepancia son estados distintos y se muestran solo cuando constan en los datos. Las explicaciones y claves se atribuyen a su documento.
+
+---
+
+# Registro anterior: MIR/27 1.2
 
 Fecha: 9 de septiembre de 2026. Aplicación: https://mir-2027.vercel.app/.
 
