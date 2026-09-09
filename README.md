@@ -12,7 +12,9 @@ Las sesiones nuevas conservan una copia del contenido usado para que una actuali
 
 La copia privada preparada contiene 3.241 preguntas, 621 lecturas, 202 tarjetas y 221 imágenes. Tras detectar errores de extracción, 2.832 preguntas quedan habilitadas y 409 apartadas de la selección automática. El filtrado es estructural, no una revisión clínica.
 
-La incorporación de este corpus a Supabase está pendiente. La base de la web conserva 45 preguntas, 12 lecturas, 12 tarjetas y cero imágenes en `mir_media`. No confundir una publicación del código con una importación del banco. El progreso existente se ha conservado.
+La incorporación autorizada a Supabase se completó: 50 lotes, 4.856 registros procesados y ninguno rechazado. La web contiene 3.250 preguntas (3.241 del corpus y 9 previas conservadas), 621 lecturas, 202 tarjetas, 221 fichas de atlas con imagen, 221 imágenes, 324 temas y 26 fuentes. Hay 2.841 preguntas habilitadas para practicar y 409 apartadas de la selección automática.
+
+Se verificó por hash que los enunciados, opciones, claves y comentarios importados coinciden con el archivo preparado y que las 221 imágenes coinciden íntegramente. No quedan referencias a imágenes inexistentes. El progreso anterior sigue idéntico; se comprobaron la lectura autorizada, el guardado y los conflictos de revisión en una transacción revertida. La vía temporal de carga quedó cerrada. Véase [el registro de verificación](ops/VERIFICATION.md).
 
 ### Verificación reproducible
 
