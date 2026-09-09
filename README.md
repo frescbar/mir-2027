@@ -8,6 +8,8 @@ Banco buscable por texto, asignatura, año y estado; comentarios de las fuentes 
 
 Las sesiones nuevas conservan una copia del contenido usado para que una actualización del banco no cambie retrospectivamente sus preguntas, opciones o claves. Las lecturas tienen paginación y búsqueda en el texto completo. La corrección identifica la respuesta por su texto y evita confundirla con la numeración de opciones mezcladas.
 
+La versión 1.1.1 incorpora «He olvidado mi contraseña», solicitud de enlace por correo y formulario para elegir una contraseña nueva. El retorno valida la sesión con Supabase, retira los tokens de la dirección y permite volver a iniciar sesión sin modificar el progreso. La configuración del destino de los correos se detalla en [recuperación de acceso](ops/ACCESS_RECOVERY.md).
+
 ### Estado del contenido a 9 de septiembre de 2026
 
 La copia privada preparada contiene 3.241 preguntas, 621 lecturas, 202 tarjetas y 221 imágenes. Tras detectar errores de extracción, 2.832 preguntas quedan habilitadas y 409 apartadas de la selección automática. El filtrado es estructural, no una revisión clínica.

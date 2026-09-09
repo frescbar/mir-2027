@@ -4,13 +4,37 @@ const API='https://baplujcmcrqnjyarkere.supabase.co',KEY='sb_publishable_Gj5hyMV
 const localMode=!!window.MIR_PRIVATE_BANK;let auth=null,role=null,revision=0,queue=Promise.resolve(),refreshPromise=null,dbPromise=null;const images=new Map();
 function sessionLoad(){if(localMode)return null;try{const v=JSON.parse(localStorage.getItem(AUTH)||localStorage.getItem(LEGACY)||'null');return v?.access_token?v:null;}catch{return null;}}
 auth=sessionLoad();
+const RECOVERY='mir27.password-recovery.v1';let recovering=false;
+try{recovering=!!auth&&sessionStorage.getItem(RECOVERY)==='1';}catch{}
+function setRecovery(value){recovering=value;try{if(value)sessionStorage.setItem(RECOVERY,'1');else sessionStorage.removeItem(RECOVERY);}catch{}}
+async function requestPasswordReset(email){
+ if(localMode)throw new Error('Abre la web de MIR/27 para recuperar el acceso.');
+ await request('/auth/v1/recover?redirect_to='+encodeURIComponent('https://mir-2027.vercel.app/'),{method:'POST',body:{email:email.trim()},bearer:false});
+}
+async function consumeRecoveryLink(){
+ const params=new URLSearchParams(location.hash.slice(1));
+ if(params.has('error')||params.has('error_code')){history.replaceState(null,'',location.pathname+location.search+'#recover');throw new Error('El enlace ha caducado o ya se ha utilizado. Solicita uno nuevo.');}
+ if(params.get('type')!=='recovery')return;
+ const access_token=params.get('access_token'),refresh_token=params.get('refresh_token');
+ history.replaceState(null,'',location.pathname+location.search+'#reset-password');
+ if(!access_token||!refresh_token){history.replaceState(null,'','#recover');throw new Error('El enlace de recuperación está incompleto. Solicita uno nuevo.');}
+ auth={access_token,refresh_token,expires_at:Math.floor(Date.now()/1000)+3600};
+ try{const user=await request('/auth/v1/user',{retry:false});if(!user?.id)throw new Error('No se pudo verificar el enlace.');persistAuth({...auth,user});setRecovery(true);}
+ catch(e){persistAuth(null);setRecovery(false);history.replaceState(null,'','#recover');throw new Error('No se pudo validar el enlace. Comprueba la conexión o solicita uno nuevo.');}
+}
+async function updatePassword(password){
+ if(!recovering||!auth)throw new Error('Abre primero el enlace de recuperación de tu correo.');
+ if(typeof password!=='string'||password.length<8)throw new Error('Utiliza al menos 8 caracteres.');
+ const user=await request('/auth/v1/user',{method:'PUT',body:{password},retry:false});
+ persistAuth({...auth,user});setRecovery(false);return user;
+}
 function persistAuth(s){auth=s?{...s,expires_at:s.expires_at||Math.floor(Date.now()/1000)+(s.expires_in||3600)}:null;try{if(auth)localStorage.setItem(AUTH,JSON.stringify(auth));else{localStorage.removeItem(AUTH);localStorage.removeItem(LEGACY);}}catch{}}
 async function request(path,{method='GET',body=null,bearer=true,retry=true}={}){if(bearer)await ensureAuth();const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);try{const headers={apikey:KEY,'Content-Type':'application/json'};if(bearer&&auth?.access_token)headers.Authorization='Bearer '+auth.access_token;const res=await fetch(API+path,{method,headers,body:body===null?undefined:JSON.stringify(body),signal:ctl.signal,cache:'no-store'});const text=await res.text();let data;try{data=text?JSON.parse(text):null;}catch{data={message:'Respuesta del servidor no interpretable'};}if(!res.ok){if(res.status===401&&bearer&&retry&&auth?.refresh_token){await refresh();return request(path,{method,body,bearer,retry:false});}const e=new Error(data?.msg||data?.error_description||data?.message||data?.error||'Error de conexión '+res.status);e.status=res.status;throw e;}return data;}catch(e){if(e.name==='AbortError')throw new Error('La conexión tardó demasiado. El progreso pendiente se conserva en este dispositivo.');throw e;}finally{clearTimeout(timer);}}
 async function refresh(){if(refreshPromise)return refreshPromise;if(!auth?.refresh_token)throw new Error('Inicia sesión para acceder al banco privado.');refreshPromise=request('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:{refresh_token:auth.refresh_token},bearer:false}).then(persistAuth).finally(()=>{refreshPromise=null;});return refreshPromise;}
 async function ensureAuth(){if(localMode)return;if(!auth?.access_token)throw new Error('Inicia sesión para acceder al banco privado.');if((auth.expires_at||0)*1000<Date.now()+45000)await refresh();}
-async function signIn(email,password){const s=await request('/auth/v1/token?grant_type=password',{method:'POST',body:{email:email.trim(),password},bearer:false});persistAuth(s);await membership();return auth.user;}
+async function signIn(email,password){const s=await request('/auth/v1/token?grant_type=password',{method:'POST',body:{email:email.trim(),password},bearer:false});persistAuth(s);setRecovery(false);await membership();return auth.user;}
 async function membership(){if(localMode){role='local';return role;}await ensureAuth();const m=await request('/rest/v1/app_members?select=role&user_id=eq.'+encodeURIComponent(auth.user.id));if(!m?.[0])throw new Error('La cuenta no tiene acceso autorizado a MIR/27.');role=m[0].role;return role;}
-async function signOut(){try{await queue;}catch{}if(auth){try{await request('/auth/v1/logout',{method:'POST'});}catch{}}persistAuth(null);role=null;images.clear();}
+async function signOut(){try{await queue;}catch{}if(auth){try{await request('/auth/v1/logout',{method:'POST'});}catch{}}persistAuth(null);setRecovery(false);role=null;images.clear();}
 function database(){if(!dbPromise)dbPromise=new Promise((resolve,reject)=>{const r=indexedDB.open('mir27.private.progress.v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('state');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(new Error('El navegador no permite almacenamiento local. Exporta tu progreso antes de cerrar.'));});return dbPromise;}
 async function idbGet(key){const db=await database();return new Promise((resolve,reject)=>{const r=db.transaction('state').objectStore('state').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 async function idbSet(key,v){const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put(v,key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
@@ -23,6 +47,6 @@ function saveState(state){state.updatedAt=Date.now();const payload=MIRCore.copy(
 async function media(id){if(localMode)return window.MIR_PRIVATE_BANK.media?.[id]||null;if(images.has(id))return images.get(id);const rows=await request('/rest/v1/mir_media?select=data&external_id=eq.'+encodeURIComponent(id)+'&limit=1');const v=rows?.[0]?.data||null;if(v){if(images.size>80)images.delete(images.keys().next().value);images.set(id,v);}return v;}
 async function importBank(b,onProgress=()=>{}){if(localMode)throw new Error('Usa la opción de conectar con la web desde el paquete privado.');if(role!=='admin')throw new Error('Solo el administrador puede incorporar el banco.');if(b?.schema!=='mir2027.bank.v2'||!Array.isArray(b.questions))throw new Error('Archivo de banco incompatible.');const sets=[['source',b.sources||[]],['media',Object.values(b.media||{})],['question',b.questions],['reading',b.readings||[]],['flashcard',b.flashcards||[]],['atlas',b.atlas||[]],['topic',(b.topicStats||[]).map((x,i)=>({...x,id:x.id||'topic-'+MIRCore.hash(x.subject+'|'+x.topic)}))]];let processed=0;const rejected=[],total=sets.reduce((n,[,items])=>n+items.length,0);for(const [kind,items] of sets){const step=kind==='media'?2:20;for(let i=0;i<items.length;i+=step){let result;for(let retry=0;;retry++){try{result=await request('/rest/v1/rpc/mir_import_batch',{method:'POST',body:{p_kind:kind,p_items:items.slice(i,i+step)}});break;}catch(e){if(retry>=3||(e.status&&e.status<500&&e.status!==429))throw e;await new Promise(r=>setTimeout(r,1000*2**retry));}}processed+=result.processed;rejected.push(...result.rejected.map(x=>({...x,kind})));onProgress({processed,total,rejected:rejected.length,kind});}}
 const manifest={...(b.manifest||{}),id:'documental-v1',importedAt:new Date().toISOString(),importComplete:rejected.length===0,processed,rejected:rejected.length};await request('/rest/v1/rpc/mir_import_batch',{method:'POST',body:{p_kind:'manifest',p_items:[manifest]}});return{processed,total,rejected};}
-async function init(){if(localMode)return{mode:'local',user:null,role:'local'};if(!auth)return{mode:'cloud',user:null,role:null};try{await membership();return{mode:'cloud',user:auth.user,role};}catch(e){if(e.status===400||e.status===401)persistAuth(null);throw e;}}
-window.MIRStore={init,signIn,signOut,loadBank,loadState,saveState,media,importBank,get local(){return localMode;},get user(){return auth?.user||null;},get role(){return role;},API};
+async function init(){if(localMode)return{mode:'local',user:null,role:'local'};await consumeRecoveryLink();if(!auth)return{mode:'cloud',user:null,role:null};if(recovering)return{mode:'cloud',user:auth.user,recovery:true};try{await membership();return{mode:'cloud',user:auth.user,role};}catch(e){if(e.status===400||e.status===401)persistAuth(null);throw e;}}
+window.MIRStore={init,signIn,signOut,requestPasswordReset,updatePassword,loadBank,loadState,saveState,media,importBank,get recovering(){return recovering;},get local(){return localMode;},get user(){return auth?.user||null;},get role(){return role;},API};
 })();
