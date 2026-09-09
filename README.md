@@ -2,9 +2,23 @@
 
 Proyecto independiente de Cultura365. La web está en `https://mir-2027.vercel.app` y su raíz de despliegue es `docs`.
 
-## Versión 1.0
+## Versión 1.1
 
-Banco buscable por texto, asignatura, año y estado; comentarios de las fuentes con página; preguntas históricas de cuatro o cinco opciones; imágenes privadas ampliables; rutina de hasta diez actividades y bloques extra; repasos, notas, favoritas, estadísticas; simulacros cronometrados con corrección al entregar; cuadernos A4 mediante impresión del navegador.
+Banco buscable por texto, asignatura, año y estado; comentarios de las fuentes con página; preguntas históricas de cuatro o cinco opciones; imágenes privadas ampliables; diez preguntas diarias por defecto y tamaño configurable de 5 a 50; modo mixto opcional; repasos, notas, favoritas, estadísticas; simulacros cronometrados con corrección al entregar; cuadernos A4 mediante impresión del navegador.
+
+Las sesiones nuevas conservan una copia del contenido usado para que una actualización del banco no cambie retrospectivamente sus preguntas, opciones o claves. Las lecturas tienen paginación y búsqueda en el texto completo. La corrección identifica la respuesta por su texto y evita confundirla con la numeración de opciones mezcladas.
+
+### Estado del contenido a 9 de septiembre de 2026
+
+La copia privada preparada contiene 3.241 preguntas, 621 lecturas, 202 tarjetas y 221 imágenes. Tras detectar errores de extracción, 2.832 preguntas quedan habilitadas y 409 apartadas de la selección automática. El filtrado es estructural, no una revisión clínica.
+
+La incorporación de este corpus a Supabase está pendiente. La base de la web conserva 45 preguntas, 12 lecturas, 12 tarjetas y cero imágenes en `mir_media`. No confundir una publicación del código con una importación del banco. El progreso existente se ha conservado.
+
+### Verificación reproducible
+
+`npm ci && npm test` ejecuta las pruebas del motor y de la interfaz en DOM simulado, con datos sintéticos y almacenamiento IndexedDB de prueba. No envía datos ni modifica la cuenta del usuario. Para comprobar también un banco privado local: `MIR_TEST_BANK=/ruta/fuera/del/repositorio/bank.json npm test`.
+
+`python3 scripts/prepare-bank.py ENTRADA.json SALIDA.json` normaliza etiquetas y aparta extracciones anómalas sin inventar contenido clínico. `python3 scripts/build-private.py BANCO.json SALIDA.html` crea una copia autocontenida. Las entradas y salidas privadas deben permanecer fuera del repositorio.
 
 Las funciones se han probado con un corpus documental privado mediante pruebas unitarias y de interfaz en un entorno controlado. Esto **no** certifica revisión clínica completa ni sustituye una prueba de extremo a extremo con el navegador y cuenta del usuario.
 
@@ -40,6 +54,6 @@ El guardado local utiliza IndexedDB. Se recomienda exportar copias; el historial
 - Preguntas anuladas, con discrepancias, sin imagen necesaria o con problemas de extracción quedan fuera del entrenamiento automático.
 - Recurrencia documental y rendimiento personal no son probabilidades validadas de aparecer en MIR 2027.
 - Un bloque 200 + 10 es una simulación de entrenamiento, no el examen oficial de 2027.
-- El correo diario automático **no está activado**.
+- El recordatorio diario con el enlace está configurado como automatización independiente, por la mañana en Europe/Madrid. No envía el banco ni las soluciones por correo y no requiere SMTP en la app.
 - La biblioteca original incluye archivos parcialmente extraíbles; no se afirma cobertura íntegra de todos los documentos.
 - No se comparte banco, repositorio ni progreso con Cultura365.
