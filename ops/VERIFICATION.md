@@ -94,3 +94,12 @@ Estas comprobaciones no equivalen a iniciar sesión con la cuenta del propietari
 Las 196 fichas pendientes siguen excluidas: 119 necesitan imagen y 77 requieren revisión. Las fuentes son históricas; no se declara revisión clínica vigente de todo el banco ni validación oficial ministerial. La adaptación del repaso es una regla de estudio, no una predicción de resultado MIR.
 
 El banco y el progreso requieren membresía. El repositorio de código seguía público al comprobarlo en esta revisión; no contiene el corpus privado. Cambiar su visibilidad requiere el propietario. Los dos avisos de Supabase documentados en la revisión anterior no se presentan como resueltos: la función restringida de invitaciones con privilegios elevados y la protección de contraseñas filtradas desactivada.
+# Verificación 1.4.0 · 2026-09-09
+
+- 45 pruebas automatizadas: memoria diaria, práctica con ayuda, recuerdo separado en el tiempo, persistencia, impresión, sesión sin conexión y protección del examen.
+- La copia HTML completa arranca con su banco privado; las fuentes y los datos clínicos permanecen fuera del repositorio público.
+- Se incorporan tarjetas de memoria y ejercicios originales mediante el banco privado. No se generan explicaciones clínicas mediante reglas léxicas: los pasajes encontrados se presentan como extractos; la ausencia de una explicación individual continúa indicada.
+- La práctica iniciada tras una pista se registra como asistida. Los ejercicios de transferencia son voluntarios y no sustituyen las preguntas diarias.
+- La nueva medición agrupa por concepto y asignatura, requiere dos preguntas distintas acertadas con seguridad en días separados por al menos siete días, y no declara dominio validado.
+- Las imágenes recuperadas conservan cuadernillo, página, número y correspondencia comprobada con el texto del examen. Se mantienen las sesiones antiguas y sus reglas de puntuación.
+- La revisión clínica global del banco y la recuperación de todas las imágenes siguen incompletas. La revisión del flujo autenticado de producción no se ha realizado sin acceso a la cuenta del usuario.

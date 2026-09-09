@@ -1,7 +1,7 @@
 /* MIR/27 1.0 · deterministic learning logic, independent of UI and network. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.MIRCore=api;})(globalThis,function(){
 'use strict';
-const DAY=86400000,VERSION='1.3.1';
+const DAY=86400000,VERSION='1.4.0';
 const copy=x=>JSON.parse(JSON.stringify(x));
 function hash(s){let h=2166136261;for(const c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
 function shuffled(a,seed){let n=hash(seed),out=[...a];const r=()=>{n+=0x6D2B79F5;let t=n;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};for(let i=out.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;}
@@ -85,8 +85,58 @@ function recall(q){
  }
  result.excerpts=selected.map(c=>c.text);return result;
 }
+
+// Keep provenance and uncertainty visible: lexical matches are excerpts, never authored refutations.
+function optionReason(q,i){
+ const authored=q.optionExplanations?.[i];if(typeof authored==='string'&&authored.trim())return{kind:'authored',text:authored,evidence:[]};
+ const clean=x=>String(x||'').replace(/\s+/g,' ').trim(),norm=x=>clean(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const evidence=(q.optionEvidence||[]).filter(e=>e.optionIndex===i&&clean(e.text));
+ if(evidence.length)return{kind:'excerpt',text:'',evidence};
+ const terms=(norm(q.options?.[i]).match(/[a-z]{5,}/g)||[]).filter(w=>!['paciente','pacientes','tratamiento','realizar','enfermedad','siguiente','siempre','ninguna','correcta','puede','pueden','deberia','existe','tiene','tienen','aumento','disminucion'].includes(w));
+ const candidates=[];
+ for(const c of q.sourceCommentaries?.length?q.sourceCommentaries:[{text:q.commentary||q.explanation,pdfPage:q.references?.[0]?.pdfPage}]){
+  // Paragraphs retain negations and qualifications; no sentence truncation.
+  for(const part of clean(c.text).split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿])/)){
+   const hits=terms.filter(w=>new RegExp('\\b'+w+'\\b').test(norm(part))).length;
+   if(hits>=Math.min(2,terms.length)&&hits>0&&part.length>=60&&part.length<=1400)candidates.push({text:part,pdfPage:c.pdfPage,sourceId:c.sourceId,hits});
+  }
+ }
+ candidates.sort((a,b)=>b.hits-a.hits);
+ if(candidates.length)return{kind:'related-excerpt',text:'',evidence:[candidates[0]]};
+ return{kind:'context',text:clean(q.commentary||q.explanation||q.sourceCommentaries?.[0]?.text),evidence:[]};
+}
+function conceptKey(q){return q.learningConcept||q.memory?.concept||((q.concept&&!/^Tema\s/i.test(q.concept))?q.concept:(q.subject||'Sin clasificar')+' · '+(q.topic||q.concept||q.id));}
+function conceptProgress(bank,s,now=Date.now()){
+ const map=new Map(bank.questions.map(q=>[q.id,q])),groups=new Map();
+ for(const a of [...s.attempts].sort((a,b)=>a.at-b.at)){
+  if(a.kind!=='question'||a.scored===false||a.help)continue;
+  const q=map.get(a.itemId),key=q?conceptKey(q):(a.concept||a.itemId);if(!key)continue;
+  if(!groups.has(key))groups.set(key,{key,label:q?.memory?.front||q?.topic||a.concept||key,subject:q?.subject||a.subject,attempts:[],families:new Set()});
+  const g=groups.get(key);g.attempts.push(a);g.families.add(q?family(q):a.itemId);
+ }
+ return [...groups.values()].map(g=>{
+  const last=g.attempts.at(-1),days=new Map();for(const a of g.attempts)days.set(dayKey(new Date(a.at),s.preferences?.timezone||'Europe/Madrid'),a);
+  const distinct=[...days.values()],previous=distinct.at(-2),success=a=>a?.correct&&a.confidence==='sure';
+  const lastQ=map.get(last.itemId),previousQ=map.get(previous?.itemId),different=(lastQ?family(lastQ):last.itemId)!==(previousQ?family(previousQ):previous?.itemId);
+  const retained=success(last)&&success(previous)&&last.at-previous.at>=7*DAY&&different&&now-last.at<=30*DAY;
+  const status=last.correct===false?'reforzar':last.confidence!=='sure'?'con_dudas':retained?'retenido':'comprobar';
+  return{key:g.key,label:g.label,subject:g.subject,status,total:g.attempts.length,correct:g.attempts.filter(a=>a.correct).length,days:days.size,distinctQuestions:g.families.size,lastAt:last.at,confidentError:last.correct===false&&last.confidence==='sure'};
+ }).sort((a,b)=>({reforzar:0,con_dudas:1,comprobar:2,retenido:3}[a.status]-{reforzar:0,con_dudas:1,comprobar:2,retenido:3}[b.status])||b.lastAt-a.lastAt);
+}
+function conceptQuestions(bank,s,key,count=2){
+ const q=uniqueQuestions(bank.questions.filter(q=>eligible(q)&&conceptKey(q)===key)),last=latest(s,bank);
+ return shuffled(q,'concept-'+key+'-'+s.attempts.length).sort((a,b)=>Number(last.has(a.id))-Number(last.has(b.id))||Number(!a.transfer)-Number(!b.transfer)||(scheduleFor(a,s)?.lastAt||0)-(scheduleFor(b,s)?.lastAt||0)).slice(0,count).map(q=>({id:q.id,kind:'question',reason:'Otro caso del mismo concepto'}));
+}
+function memoryOfDay(bank,s,date){
+ const cards=(bank.flashcards||[]).filter(c=>c.memoryCard&&c.mnemonic);if(!cards.length)return null;
+ const protectedKeys=new Set();
+ for(const session of Object.values(s.sessions||{}))if(session.status!=='complete')for(const item of session.items||[])if(item.data)protectedKeys.add(conceptKey(item.data));
+ if(!s.sessions['daily-'+date])for(const item of selectDaily(bank,s,date,s.preferences.dailySize)){const q=bank.questions.find(q=>q.id===item.id);if(q)protectedKeys.add(conceptKey(q));}
+ const available=cards.filter(c=>!protectedKeys.has(c.concept));if(!available.length)return null;
+ return shuffled(available,'memory-'+date)[0];
+}
 function itemScored(item){return item.kind==='question'&&(typeof item.scored==='boolean'?item.scored:eligible(item.data));}
-function selectionPool(bank,s){return bank.questions.filter(q=>studyable(q)&&(s.preferences.includeObservations||eligible(q))).sort((a,b)=>Number(!eligible(a))-Number(!eligible(b))||Number(!!a.duplicateOf)-Number(!!b.duplicateOf));}
+function selectionPool(bank,s){return bank.questions.filter(q=>!q.transfer&&studyable(q)&&(s.preferences.includeObservations||eligible(q))).sort((a,b)=>Number(!eligible(a))-Number(!eligible(b))||Number(!!a.duplicateOf)-Number(!!b.duplicateOf));}
 function studyLatest(state){const out=new Map();for(const a of [...state.attempts].sort((a,b)=>(a.at||0)-(b.at||0)))if(a.kind==='question'&&a.scored===false)out.set(a.itemId,a);return out;}
 function studySchedule(q,s){return s.studySchedule[q.id];}
 function latest(state,bank){const aliases=new Map();for(const q of bank?.questions||[])for(const id of q.equivalentIds||[])aliases.set(id,q.id);const out=new Map();for(const a of [...state.attempts].sort((a,b)=>(a.at||0)-(b.at||0)))if(a.kind==='question'&&a.scored!==false)out.set(aliases.get(a.itemId)||a.itemId,a);return out;}
@@ -120,7 +170,7 @@ function selectQuestions(bank,s,count,seed){
  return picked;
 }
 function selectDaily(bank,s,date,size=10){size=Math.max(1,Math.min(50,Math.floor(Number(size)||10)));if(s.preferences.dailyMode==='questions')return selectQuestions(bank,s,size,date);const nq=Math.min(size,Math.ceil(size*.6)),nc=Math.floor((size-nq)/2),nr=size-nq-nc;const other=(items,n,kind)=>shuffled(items,date+kind).sort((a,b)=>(s.schedule[a.id]?.dueAt||0)-(s.schedule[b.id]?.dueAt||0)).slice(0,n).map(x=>({kind,id:x.id,reason:'Recuperación y lectura de fuentes'}));const out=[...selectQuestions(bank,s,nq,date),...other(bank.flashcards,nc,'flashcard'),...other(bank.readings,nr,'reading')];if(out.length<size){const used=new Set(out.map(x=>x.id));out.push(...selectQuestions(bank,s,size,date+'fill').filter(x=>!used.has(x.id)).slice(0,size-out.length));}return out;}
-function makeSession(bank,s,items,{title='Práctica',kind='practice',mode='study',minutes=0,mainCount=items.length,id=null,shuffleOptions=true}={}){const sid=id||kind+'-'+uid(),now=Date.now(),map=new Map([...bank.questions,...bank.flashcards,...bank.readings].map(x=>[x.id,x]));return{id:sid,title,kind,mode,date:dayKey(),createdAt:now,updatedAt:now,startedAt:now,deadline:minutes?now+minutes*60000:null,mainCount,items:items.map(x=>{const d=x.data||map.get(x.id);if(!d)return null;return{kind:x.kind||'question',id:x.id,reason:x.reason||'Selección del banco',data:copy(d),order:d.options?(shuffleOptions&&mode!=='exam'?shuffled(d.options.map((_,i)=>i),sid+d.id):d.options.map((_,i)=>i)):null,answerKey:d.answer??null,scored:(x.kind||'question')==='question'?eligible(d):null,observationSnapshot:(x.kind||'question')==='question'?observations(d):[],sourceVersion:hash(d.stem||d.front||d.title||'')};}).filter(Boolean),answers:{},index:0,status:'active',attemptsCommitted:false};}
+function makeSession(bank,s,items,{title='Práctica',kind='practice',mode='study',minutes=0,mainCount=items.length,id=null,shuffleOptions=true,assisted=false}={}){const sid=id||kind+'-'+uid(),now=Date.now(),map=new Map([...bank.questions,...bank.flashcards,...bank.readings].map(x=>[x.id,x]));return{id:sid,title,kind,mode,date:dayKey(),createdAt:now,updatedAt:now,startedAt:now,deadline:minutes?now+minutes*60000:null,mainCount,items:items.map(x=>{const d=x.data||map.get(x.id);if(!d)return null;return{kind:x.kind||'question',id:x.id,reason:x.reason||'Selección del banco',assisted:!!assisted,data:copy(d),order:d.options?(shuffleOptions&&mode!=='exam'?shuffled(d.options.map((_,i)=>i),sid+d.id):d.options.map((_,i)=>i)):null,answerKey:d.answer??null,scored:(x.kind||'question')==='question'?eligible(d):null,observationSnapshot:(x.kind||'question')==='question'?observations(d):[],sourceVersion:hash(d.stem||d.front||d.title||'')};}).filter(Boolean),answers:{},index:0,status:'active',attemptsCommitted:false};}
 function schedule(prev,a){
  let days;const success=a.kind==='question'?a.correct&&!a.help&&a.confidence!=='guess':a.rating==='good';
  const streak=success?(prev?.streak||0)+1:0,lapses=(prev?.lapses||0)+(a.kind==='question'&&!a.correct?1:0);
@@ -131,11 +181,11 @@ function schedule(prev,a){
  else days=Math.min(7,Math.max(2,Math.round((prev?.intervalDays||1)*1.5)));
  return{dueAt:a.at+days*DAY,lastAt:a.at,intervalDays:days,repetitions:(prev?.repetitions||0)+1,streak,lapses,lastConfidence:a.confidence||'unsure'};
 }
-function commit(s,session,i,lookup){const item=session.items[i],a=session.answers[i];if(!a?.submitted)return;const id=session.id+':'+i;if(s.attempts.some(x=>x.id===id))return;const q=item.data||lookup(item.id)||{},key=item.answerKey??q.answer,scored=itemScored(item);const record={id,sessionId:session.id,itemId:item.id,kind:item.kind,subject:q.subject||'Sin clasificar',concept:q.concept||q.topic||item.id,selected:a.selected??null,scored:item.kind==='question'?scored:null,correct:item.kind==='question'&&scored?a.selected!=null&&a.selected===key:null,blank:item.kind==='question'&&scored&&a.selected==null,confidence:a.confidence||'unsure',rating:a.rating,seconds:a.seconds||0,help:!!a.help,at:a.at||Date.now(),first:!s.attempts.some(x=>x.kind===item.kind&&(item.kind!=='question'||(x.scored!==false)===scored)&&[item.id,...(q.equivalentIds||[])].includes(x.itemId)),mode:session.mode,sourceVersion:item.sourceVersion};s.attempts.push(record);if(item.kind==='question'&&!scored){const prev=s.studySchedule[item.id];s.studySchedule[item.id]={dueAt:record.at+7*DAY,lastAt:record.at,intervalDays:7,repetitions:(prev?.repetitions||0)+1};}else s.schedule[item.id]=schedule(scheduleFor(q,s),record);}
+function commit(s,session,i,lookup){const item=session.items[i],a=session.answers[i];if(!a?.submitted)return;const id=session.id+':'+i;if(s.attempts.some(x=>x.id===id))return;const q=item.data||lookup(item.id)||{},key=item.answerKey??q.answer,scored=itemScored(item);const record={id,sessionId:session.id,itemId:item.id,kind:item.kind,subject:q.subject||'Sin clasificar',concept:q.learningConcept||q.concept||q.topic||item.id,transfer:!!q.transfer,selected:a.selected??null,scored:item.kind==='question'?scored:null,correct:item.kind==='question'&&scored?a.selected!=null&&a.selected===key:null,blank:item.kind==='question'&&scored&&a.selected==null,confidence:a.confidence||'unsure',rating:a.rating,seconds:a.seconds||0,help:!!a.help||!!item.assisted,at:a.at||Date.now(),first:!s.attempts.some(x=>x.kind===item.kind&&(item.kind!=='question'||(x.scored!==false)===scored)&&[item.id,...(q.equivalentIds||[])].includes(x.itemId)),mode:session.mode,sourceVersion:item.sourceVersion};s.attempts.push(record);if(item.kind==='question'&&!scored){const prev=s.studySchedule[item.id];s.studySchedule[item.id]={dueAt:record.at+7*DAY,lastAt:record.at,intervalDays:7,repetitions:(prev?.repetitions||0)+1};}else s.schedule[item.id]=schedule(scheduleFor(q,s),record);}
 function answer(s,session,i,a,lookup){if(session.status==='complete')return false;if(session.mode!=='exam'&&session.answers[i]?.submitted)return false;session.answers[i]={selected:a.selected??null,confidence:a.confidence||'unsure',rating:a.rating||null,seconds:Math.max(0,Math.min(3600,Math.round(a.seconds||0))),help:!!a.help,submitted:true,at:Date.now()};session.updatedAt=Date.now();if(session.mode!=='exam')commit(s,session,i,lookup);return true;}
 function finish(s,session,lookup){if(session.status==='complete')return;session.items.forEach((item,i)=>{if(!session.answers[i]?.submitted&&item.kind==='question')session.answers[i]={selected:null,confidence:'unsure',submitted:true,at:Date.now(),seconds:0};commit(s,session,i,lookup);});session.status='complete';session.completedAt=Date.now();session.updatedAt=session.completedAt;session.attemptsCommitted=true;if(s.activeSession===session.id)s.activeSession=null;}
 function score(session){let correct=0,wrong=0,blank=0;session.items.slice(0,session.mainCount??session.items.length).forEach((x,i)=>{if(x.kind!=='question'||!itemScored(x))return;const a=session.answers[i],key=x.answerKey??x.data?.answer;if(!Number.isInteger(key))return;if(a?.selected==null)blank++;else if(a.selected===key)correct++;else wrong++;});return{correct,wrong,blank,total:correct+wrong+blank,raw:correct*3-wrong,net:correct-wrong/3};}
 function merge(a,b){a=normalize(a);b=normalize(b);const out=normalize((a.updatedAt||0)>=(b.updatedAt||0)?copy(a):copy(b));out.revision=Math.max(a.revision||0,b.revision||0);out.attempts=[...new Map([...a.attempts,...b.attempts].sort((x,y)=>(x.at||0)-(y.at||0)).map(x=>[x.id,x])).values()].sort((x,y)=>(x.at||0)-(y.at||0));const pick=(x,y)=>!x?y:!y?x:(x.updatedAt||x.lastAt||x.at||0)>=(y.updatedAt||y.lastAt||y.at||0)?x:y;for(const k of ['sessions','notes','marks','schedule','studySchedule','readPositions']){out[k]={};for(const id of new Set([...Object.keys(a[k]),...Object.keys(b[k])])){const x=a[k][id],y=b[k][id];let v=pick(x,y);if(k==='sessions'&&x&&y){v=copy(v);v.answers={};for(const ix of new Set([...Object.keys(x.answers||{}),...Object.keys(y.answers||{})]))v.answers[ix]=pick(x.answers[ix],y.answers[ix]);if(x.status==='complete'||y.status==='complete')v.status='complete';}out[k][id]=v;}}out.reports=[...new Map([...a.reports,...b.reports].map(x=>[x.id||x.itemId,x])).values()];return out;}
 function numeric(seed,type='nnt'){const r=shuffled([2,4,5,10],seed)[0],base=30,value=100/r,vals=shuffled([...new Set([value,r,base,100/(base-r),base+7])].slice(0,4),seed+'answers');return{id:'calc-'+hash(seed),kind:'question',origin:'Ejercicio matemático original · no pregunta oficial',status:'variante_matematica',subject:'Estadística y Epidemiología',topic:'NNT',concept:'nnt',stem:`Ejemplo ficticio: en el mismo periodo el riesgo del grupo control es ${base}% y el tratado ${base-r}%. ¿Cuál es el NNT?`,options:vals.map(x=>Number(x.toFixed(2)).toLocaleString('es-ES')+' pacientes'),answer:vals.indexOf(value),commentary:`La reducción absoluta del riesgo es ${base} − ${base-r} = ${r} puntos porcentuales, equivalentes a ${r/100}. NNT = 1 / RAR = 100 / ${r} = ${value}. No se utiliza directamente el riesgo del grupo control ni el del tratado: se utiliza su diferencia absoluta. El NNT se refiere al periodo de seguimiento que comparten ambos grupos.`,references:[],images:[],imageRequired:false};}
-return{VERSION,DAY,copy,hash,shuffled,uid,dayKey,blank,normalize,valid,eligible,studyable,observations,hasObservations,recall,itemScored,selectionPool,studyLatest,studySchedule,latest,stats,scheduleFor,markFor,uniqueQuestions,selectQuestions,selectDaily,makeSession,answer,finish,score,merge,numeric};
+return{VERSION,DAY,copy,hash,shuffled,uid,dayKey,blank,normalize,valid,eligible,studyable,observations,hasObservations,recall,optionReason,conceptKey,conceptProgress,conceptQuestions,memoryOfDay,itemScored,selectionPool,studyLatest,studySchedule,latest,stats,scheduleFor,markFor,uniqueQuestions,selectQuestions,selectDaily,makeSession,answer,finish,score,merge,numeric};
 });

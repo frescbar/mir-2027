@@ -7,6 +7,17 @@ const {IDBFactory}=require('fake-indexeddb');
 const root=path.join(__dirname,'..');
 const fixture={questions:Array.from({length:60},(_,i)=>({id:'q'+i,kind:'question',stem:`Ejercicio de prueba ${i}: elige la opción señalada en este conjunto sintético.`,options:['A','B','C','D'],answer:2,subject:'Prueba',status:'historico_documental',commentary:'Explicación de prueba',references:[],images:[]})),readings:Array.from({length:60},(_,i)=>({id:'r'+i,title:'Lectura '+i,subject:'Prueba',sections:[{title:'Sección',text:'Texto completo '+i}]})),flashcards:[],atlas:[],sources:[],topicStats:[],media:{},manifest:{}};
 const bank=process.env.MIR_TEST_BANK?JSON.parse(fs.readFileSync(process.env.MIR_TEST_BANK,'utf8')):fixture;
+test('home displays an authored mnemonic and its transfer button records assisted practice',async()=>{
+ const content=structuredClone(fixture),m={id:'memory-transfer',concept:'transfer',memoryCard:true,front:'Synthetic memory',mnemonic:'Memorable synthetic phrase',clue:'Specific clue',trap:'Specific trap',visual:[['Left','Right']],references:[]};
+ content.flashcards=[m];content.questions.push({...content.questions[0],id:'variant',stem:'Different synthetic transfer case',learningConcept:'transfer',transfer:true,memory:m,optionExplanations:['Reason A','Reason B','Reason C','Reason D']});
+ const app=await boot(new IDBFactory(),content);try{
+  assert.match(app.w.document.querySelector('.daily-memory').textContent,/Memorable synthetic phrase/);assert.equal(app.w.document.querySelectorAll('.memory-map>div').length,1);
+  app.click('.daily-memory [data-action="concept-practice"]');await until(()=>app.w.document.querySelector('.options'));assert.equal(app.w.document.querySelector('.correction'),null);
+  app.click('.option');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.correction'));
+  const s=await app.w.MIRStore.loadState();assert.equal(s.attempts[0].help,true);assert.equal(s.attempts[0].transfer,true);assert.equal(s.preferences.dailySize,10);assert.ok(app.w.document.querySelector('.recall-prompt .memory-map'));
+  assert.deepEqual(app.errors,[]);
+ }finally{app.dom.window.close();}
+});
 async function until(check){for(let i=0;i<120;i++){if(check())return;await new Promise(r=>setTimeout(r,15));}throw new Error('Expected application state did not appear');}
 async function boot(db,content=bank){
  const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
