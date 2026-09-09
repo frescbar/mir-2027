@@ -1,7 +1,7 @@
 /* MIR/27 1.0 · deterministic learning logic, independent of UI and network. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.MIRCore=api;})(globalThis,function(){
 'use strict';
-const DAY=86400000,VERSION='1.3.0';
+const DAY=86400000,VERSION='1.3.1';
 const copy=x=>JSON.parse(JSON.stringify(x));
 function hash(s){let h=2166136261;for(const c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
 function shuffled(a,seed){let n=hash(seed),out=[...a];const r=()=>{n+=0x6D2B79F5;let t=n;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};for(let i=out.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;}
@@ -27,6 +27,64 @@ function observations(q){
  return out;
 }
 function hasObservations(q){return observations(q).length>0;}
+// A ready-to-read memory card, derived only from this question's frozen content.
+// Excerpts keep complete source sentences, including negations and conditions.
+function recall(q){
+ const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
+ const norm=s=>clean(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const stop=new Set('para como cuando donde porque sobre entre desde hasta este esta estos estas esto eso una unos unas del las los que con por sus mas muy pero puede pueden paciente pacientes caso pregunta respuesta opcion correcta correcto incorrecta incorrecto falsa falso senale siguientes siguiente respecto relacion cual son tiene seria trata'.split(' '));
+ const words=s=>new Set((norm(s).match(/[a-z0-9]+/g)||[]).filter(w=>w.length>2&&!stop.has(w)).map(w=>w.length>5?w.replace(/(?:es|s)$/,'').replace(/[oa]$/,''):w));
+ const split=text=>{
+  const all=clean(text),out=[];let start=0,depth=0;
+  for(let i=0;i<all.length;i++){
+   if(all[i]==='(')depth++;else if(all[i]===')')depth=Math.max(0,depth-1);
+   if(depth||!/[.!?]/.test(all[i])||!/\s/.test(all[i+1]||''))continue;
+   const prefix=all.slice(start,i+1),next=all.slice(i+1).trimStart();
+   // Preserve decimal values, initials, species names and common abbreviations.
+   if(!/^[A-ZÁÉÍÓÚÜÑ¿¡0-9•]/.test(next)||/(?:\b[A-ZÁÉÍÓÚÜÑ]|\b(?:Dr|Dra|Sr|Sra|nº|fig|Fig|aprox|p|pág|Pag|ed))\.$/.test(prefix))continue;
+   if(/^(?:\(?(?:respuesta|opci[oó]n)\b)/i.test(next))continue;
+   out.push(prefix.trim());start=i+1;
+  }
+  if(all.slice(start).trim())out.push(all.slice(start).trim());
+  return out;
+ };
+ const key=Number.isInteger(q.answer)?clean(q.options?.[q.answer]):'';
+ const instruction=clean(q.stem).split(/[¿?]/).filter(x=>/[a-záéíóúñ]/i.test(x)).at(-1)||'';
+ const negative=/\b(?:incorrect[ao]s?|fals[ao]s?|excepto)\b|\bno\s+(?:es|son|se|ser[ií]a|corresponde|constituye|est[aá]|est[aá]n|forma|debe|deber[ií]a|incluye|presenta|resulta|puede)/i.test(instruction);
+ const disputed=!!(q.sourceDiscrepancy||q.isAnnulled||q.isChallenged||q.challengeStatus==='pending'||q.flags?.some(f=>/discrepancia|anulacion|anulada/.test(f)));
+ const warnings=[];
+ if(negative)warnings.push('El enunciado pide la falsa o la excepción: la opción señalada no debe memorizarse como una afirmación verdadera.');
+ if(disputed)warnings.push('La clave está cuestionada o la pregunta está anulada: este recordatorio conserva la explicación documental, sin dar una respuesta por válida.');
+ if(q.imageRequired&&!q.images?.length&&!q.image)warnings.push('Falta la imagen original: el recordatorio procede del comentario, no de una comprobación visual.');
+ const authored=typeof q.takeaway==='string'&&clean(q.takeaway)&&!/cierra el comentario|intenta explicar|anotar mi idea/i.test(q.takeaway)?clean(q.takeaway):'';
+ const result={idea:!disputed?authored:'',key:disputed?'':key,keyLabel:negative?'Excepción señalada por la fuente':'Respuesta que retener según la fuente',negative,excerpts:[],warnings,source:null};
+ if(authored&&!disputed)return result;
+ const comment=clean(q.commentary||q.explanation),sources=(q.sourceCommentaries||[]).filter(c=>clean(c.text));
+ const source=sources.find(c=>clean(c.text)===comment)||(!comment?sources[0]:null)||{text:comment,title:'Comentario de la fuente',pdfPage:q.references?.[0]?.pdfPage};
+ const sourceText=clean(source.text);result.source={title:source.title||'Comentario de la fuente',pdfPage:source.pdfPage||null};
+ if(!sourceText){result.warnings.push('La fuente no aporta un razonamiento suficiente para resumir esta pregunta.');return result;}
+ const answerWords=words(key),stemWords=words(q.stem),sourceOptions=source.options||q.options||[];
+ const keyIndex=sourceOptions.findIndex(x=>norm(x)===norm(key));
+ const marker=keyIndex>=0?new RegExp('(?:respuesta|opci[oó]n)\\s*(?:n[.º°]?[ ]*)?'+(keyIndex+1)+'\\b','i'):null;
+ const candidates=split(sourceText).map((text,index)=>{
+  const terms=words(text),overlap=[...answerWords].filter(x=>terms.has(x)).length,stemOverlap=[...stemWords].filter(x=>terms.has(x)).length;
+  const meta=/^(?:pregunta (?:f[aá]cil|sencilla|dif[ií]cil|compleja|relativamente|algo)|(?:esta|la) pregunta (?:es |se |puede |trata))/i.test(text);
+  const meaningful=terms.size>=4&&!/^(?:harrison|farreras|bibliograf[ií]a|referencias)\b/i.test(text);
+  const score=overlap*5+Math.min(stemOverlap,7)*.5+(marker?.test(text)?12:0)+(/\b(?:recuerda|recordar|recordamos|clave|pista|caracter[ií]stic[ao]|se diferencia|a diferencia|diagn[oó]stico|por tanto|por ello)\b/i.test(text)?3:0)-(text.length>800?8:0)-(meta?8:0)-(index===0?0:0.1);
+  return{text,index,score,meaningful};
+ }).filter(c=>c.meaningful);
+ if(!candidates.length){result.warnings.push('El comentario disponible no permite aislar una idea breve con suficiente contexto.');return result;}
+ candidates.sort((a,b)=>b.score-a.score||a.index-b.index);
+ const best=candidates.find(c=>c.text.length<=1000)||candidates[0],selected=[best];
+ // Dependent sentences need their preceding sentence to retain the subject.
+ if(/^(?:adem[aá]s|asimismo|por (?:ello|tanto)|sin embargo|en cambio|pero|este tipo|esta (?:t[eé]cnica|enfermedad|prueba|medida)|su |estos |estas |esto |ello |dicha |dicho |tambi[eé]n)\b/i.test(best.text)){
+  const previous=candidates.find(c=>c.index===best.index-1);if(previous)selected.unshift(previous);
+ }else if(best.text.length<450){
+  const next=candidates.find(c=>c.index===best.index+1);
+  if(next&&next.text.length+best.text.length<780)selected.push(next);
+ }
+ result.excerpts=selected.map(c=>c.text);return result;
+}
 function itemScored(item){return item.kind==='question'&&(typeof item.scored==='boolean'?item.scored:eligible(item.data));}
 function selectionPool(bank,s){return bank.questions.filter(q=>studyable(q)&&(s.preferences.includeObservations||eligible(q))).sort((a,b)=>Number(!eligible(a))-Number(!eligible(b))||Number(!!a.duplicateOf)-Number(!!b.duplicateOf));}
 function studyLatest(state){const out=new Map();for(const a of [...state.attempts].sort((a,b)=>(a.at||0)-(b.at||0)))if(a.kind==='question'&&a.scored===false)out.set(a.itemId,a);return out;}
@@ -79,5 +137,5 @@ function finish(s,session,lookup){if(session.status==='complete')return;session.
 function score(session){let correct=0,wrong=0,blank=0;session.items.slice(0,session.mainCount??session.items.length).forEach((x,i)=>{if(x.kind!=='question'||!itemScored(x))return;const a=session.answers[i],key=x.answerKey??x.data?.answer;if(!Number.isInteger(key))return;if(a?.selected==null)blank++;else if(a.selected===key)correct++;else wrong++;});return{correct,wrong,blank,total:correct+wrong+blank,raw:correct*3-wrong,net:correct-wrong/3};}
 function merge(a,b){a=normalize(a);b=normalize(b);const out=normalize((a.updatedAt||0)>=(b.updatedAt||0)?copy(a):copy(b));out.revision=Math.max(a.revision||0,b.revision||0);out.attempts=[...new Map([...a.attempts,...b.attempts].sort((x,y)=>(x.at||0)-(y.at||0)).map(x=>[x.id,x])).values()].sort((x,y)=>(x.at||0)-(y.at||0));const pick=(x,y)=>!x?y:!y?x:(x.updatedAt||x.lastAt||x.at||0)>=(y.updatedAt||y.lastAt||y.at||0)?x:y;for(const k of ['sessions','notes','marks','schedule','studySchedule','readPositions']){out[k]={};for(const id of new Set([...Object.keys(a[k]),...Object.keys(b[k])])){const x=a[k][id],y=b[k][id];let v=pick(x,y);if(k==='sessions'&&x&&y){v=copy(v);v.answers={};for(const ix of new Set([...Object.keys(x.answers||{}),...Object.keys(y.answers||{})]))v.answers[ix]=pick(x.answers[ix],y.answers[ix]);if(x.status==='complete'||y.status==='complete')v.status='complete';}out[k][id]=v;}}out.reports=[...new Map([...a.reports,...b.reports].map(x=>[x.id||x.itemId,x])).values()];return out;}
 function numeric(seed,type='nnt'){const r=shuffled([2,4,5,10],seed)[0],base=30,value=100/r,vals=shuffled([...new Set([value,r,base,100/(base-r),base+7])].slice(0,4),seed+'answers');return{id:'calc-'+hash(seed),kind:'question',origin:'Ejercicio matemático original · no pregunta oficial',status:'variante_matematica',subject:'Estadística y Epidemiología',topic:'NNT',concept:'nnt',stem:`Ejemplo ficticio: en el mismo periodo el riesgo del grupo control es ${base}% y el tratado ${base-r}%. ¿Cuál es el NNT?`,options:vals.map(x=>Number(x.toFixed(2)).toLocaleString('es-ES')+' pacientes'),answer:vals.indexOf(value),commentary:`La reducción absoluta del riesgo es ${base} − ${base-r} = ${r} puntos porcentuales, equivalentes a ${r/100}. NNT = 1 / RAR = 100 / ${r} = ${value}. No se utiliza directamente el riesgo del grupo control ni el del tratado: se utiliza su diferencia absoluta. El NNT se refiere al periodo de seguimiento que comparten ambos grupos.`,references:[],images:[],imageRequired:false};}
-return{VERSION,DAY,copy,hash,shuffled,uid,dayKey,blank,normalize,valid,eligible,studyable,observations,hasObservations,itemScored,selectionPool,studyLatest,studySchedule,latest,stats,scheduleFor,markFor,uniqueQuestions,selectQuestions,selectDaily,makeSession,answer,finish,score,merge,numeric};
+return{VERSION,DAY,copy,hash,shuffled,uid,dayKey,blank,normalize,valid,eligible,studyable,observations,hasObservations,recall,itemScored,selectionPool,studyLatest,studySchedule,latest,stats,scheduleFor,markFor,uniqueQuestions,selectQuestions,selectDaily,makeSession,answer,finish,score,merge,numeric};
 });

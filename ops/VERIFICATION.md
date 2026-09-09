@@ -1,3 +1,16 @@
+# Verificación de MIR/27 1.3.1
+
+Fecha: 9 de septiembre de 2026.
+
+- 38 pruebas superadas con el corpus privado: incluyen contenido listo para leer, conservación de condiciones y negaciones, enunciados negativos, fuentes con distinto orden de alternativas, sesiones congeladas, persistencia e impresión sin adelantar soluciones.
+- Cobertura recorrida en las 3.250 preguntas de la web: 36 ideas existentes y 3.214 recordatorios extractivos. Cada frase seleccionada se comprobó como parte del comentario de esa misma pregunta (normalizando espacios). Esta comprobación es documental, no una validación clínica individual.
+- Se han retirado del apartado la instrucción «Cierra el comentario…» y el botón «Anotar mi idea clave». Las notas personales del usuario se conservan.
+- La lógica se ejecuta en el cliente sobre el contenido de cada sesión. No se modifica Supabase, el banco, las imágenes, las claves ni el progreso remoto.
+- La copia privada autocontenida se reconstruye con el mismo banco de 3.241 preguntas.
+- La comprobación visual local no pudo completarse: el navegador devolvió ERR_BLOCKED_BY_CLIENT al abrir el servidor local. No se afirma una prueba visual de extremo a extremo dentro de la cuenta del usuario.
+
+---
+
 # Verificación de MIR/27 1.3
 
 Fecha: 9 de septiembre de 2026. Aplicación: https://mir-2027.vercel.app/.

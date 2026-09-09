@@ -2,6 +2,12 @@
 
 Proyecto independiente de Cultura365. La web está en `https://mir-2027.vercel.app` y su raíz de despliegue es `docs`.
 
+## Versión 1.3.1 · Recordatorios preparados
+
+«Para recordarlo» muestra la idea ya redactada cuando existe. En el resto de preguntas prepara un recordatorio extractivo con la respuesta atribuida a la fuente y frases completas seleccionadas del comentario de esa misma ficha. Conserva negaciones, condiciones, procedencia y la numeración original. Las preguntas en negativo y las incidencias mantienen su aviso; una clave cuestionada no se presenta como válida. Desaparecen la consigna de cerrar el comentario y el botón «Anotar mi idea clave» de ese apartado.
+
+El bloque se muestra después de responder y en los cuadernos con soluciones; en simulacros, después de entregar. Funciona también con el contenido congelado de sesiones anteriores y en la copia privada, sin solicitudes de IA, servicios nuevos ni cambios al banco o al historial. La selección de extractos no equivale a una revisión clínica independiente ni a una síntesis clínica redactada individualmente para las 3.250 preguntas.
+
 ## Versión 1.3
 
 Banco buscable por texto, asignatura, año y estado; comentarios de las fuentes con página; preguntas históricas de cuatro o cinco opciones; imágenes privadas ampliables; diez preguntas diarias por defecto y tamaño configurable de 5 a 50; modo mixto opcional; repasos, notas, favoritas, estadísticas; simulacros cronometrados con corrección al entregar; cuadernos A4 mediante impresión del navegador.

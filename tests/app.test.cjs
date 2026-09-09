@@ -107,3 +107,15 @@ test('source excerpts follow option identity and commentary images appear only a
   assert.match(option.querySelector('summary').textContent,/A$/);assert.equal(option.querySelector('blockquote').textContent,'Literal documentary explanation of A');assert.ok(app.w.document.querySelector('[data-media="solution-picture"]'));assert.deepEqual(app.errors,[]);
  }finally{app.dom.window.close();}
 });
+test('ready-made memory cards appear after answering, survive reload and print only with solutions',async()=>{
+ const content=structuredClone(fixture);content.questions=content.questions.slice(0,1);const q=content.questions[0];q.options=['Primera señal','Segunda señal','Señal estable','Cuarta señal'];q.commentary='La señal estable se conserva cuando el circuito está cerrado. No se conserva cuando el circuito está abierto.';
+ const db=new IDBFactory();let app=await boot(db,content);
+ try{
+  app.click('[data-action="daily"]');await until(()=>app.w.document.querySelector('.options'));assert.equal(app.w.document.querySelector('.recall-prompt'),null);
+  app.click('.option');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.recall-prompt'));
+  const card=app.w.document.querySelector('.recall-prompt');assert.match(card.textContent,/se conserva cuando el circuito está cerrado/);assert.doesNotMatch(card.textContent,/Cierra el comentario|Anotar mi idea clave/);assert.equal(card.querySelector('[data-action="note"]'),null);
+  const state=await app.w.MIRStore.loadState(),session=Object.values(state.sessions)[0];const plain=await app.w.MIRPrint.build(session,()=>q,async()=>null);assert.doesNotMatch(plain,/Para recordarlo/);
+  const explained=await app.w.MIRPrint.build(session,()=>q,async()=>null,{solutions:true});assert.match(explained,/Para recordarlo/);assert.match(explained,/No se conserva cuando el circuito está abierto/);assert.deepEqual(app.errors,[]);
+ }finally{app.dom.window.close();}
+ app=await boot(db,content);try{app.click('[data-action="daily"]');await until(()=>app.w.document.querySelector('.recall-prompt'));assert.match(app.w.document.querySelector('.recall-prompt').textContent,/Señal estable/);}finally{app.dom.window.close();}
+});
