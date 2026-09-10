@@ -1,6 +1,6 @@
 /* Cache the application shell only. Private study data is never cached here. */
-const CACHE='mir27-shell-1.5.0';
-const ASSETS=['/','/index.html','/core-v1.js?v=1.5.0','/learning-v1.js?v=1.5.0','/store-v1.js?v=1.5.0','/app-v1.js?v=1.5.0','/print-v1.js?v=1.5.0','/launcher.js?v=1.5.0','/offline-v1.js?v=1.5.0','/styles-v1.css?v=1.5.0','/icon.svg','/manifest.webmanifest'];
+const CACHE='mir27-shell-1.5.1';
+const ASSETS=['/','/index.html','/core-v1.js?v=1.5.1','/learning-v1.js?v=1.5.1','/store-v1.js?v=1.5.1','/app-v1.js?v=1.5.1','/print-v1.js?v=1.5.1','/launcher.js?v=1.5.1','/offline-v1.js?v=1.5.1','/styles-v1.css?v=1.5.1','/icon.svg','/manifest.webmanifest'];
 const PATHS=new Set(ASSETS.map(x=>new URL(x,self.location.origin).pathname));
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('mir27-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

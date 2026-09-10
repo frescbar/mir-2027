@@ -1,7 +1,7 @@
 /* MIR/27 1.0 · deterministic learning logic, independent of UI and network. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.MIRCore=api;})(globalThis,function(){
 'use strict';
-const DAY=86400000,VERSION='1.5.0';
+const DAY=86400000,VERSION='1.5.1';
 const copy=x=>JSON.parse(JSON.stringify(x));
 function hash(s){let h=2166136261;for(const c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
 function shuffled(a,seed){let n=hash(seed),out=[...a];const r=()=>{n+=0x6D2B79F5;let t=n;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};for(let i=out.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;}
