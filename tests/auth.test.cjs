@@ -10,7 +10,7 @@ function boot(hash='',respond=()=>{throw Error('Unexpected network request');}){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'docs/index.html'),'utf8'),{url:'https://mir-2027.vercel.app/'+hash,runScripts:'outside-only',virtualConsole:vc});
  const w=dom.window;w.scrollTo=()=>{};w.structuredClone=structuredClone;
  w.fetch=async(url,options)=>{const call={url,method:options.method,body:options.body?JSON.parse(options.body):null,headers:options.headers};calls.push(call);const out=respond(call);return new Response(JSON.stringify(out.body??out),{status:out.status||200});};
- for(const name of ['core-v1','store-v1','print-v1','launcher','app-v1'])w.eval(fs.readFileSync(path.join(root,'docs',name+'.js'),'utf8'));
+ for(const name of ['core-v1','learning-v1','store-v1','print-v1','launcher','app-v1'])w.eval(fs.readFileSync(path.join(root,'docs',name+'.js'),'utf8'));
  return{dom,w,calls,errors,find:s=>w.document.querySelector(s)};
 }
 test('forgot-password form sends a recovery request without authenticating or touching progress',async()=>{

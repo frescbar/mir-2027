@@ -7,6 +7,30 @@ const {IDBFactory}=require('fake-indexeddb');
 const root=path.join(__dirname,'..');
 const fixture={questions:Array.from({length:60},(_,i)=>({id:'q'+i,kind:'question',stem:`Ejercicio de prueba ${i}: elige la opción señalada en este conjunto sintético.`,options:['A','B','C','D'],answer:2,subject:'Prueba',status:'historico_documental',commentary:'Explicación de prueba',references:[],images:[]})),readings:Array.from({length:60},(_,i)=>({id:'r'+i,title:'Lectura '+i,subject:'Prueba',sections:[{title:'Sección',text:'Texto completo '+i}]})),flashcards:[],atlas:[],sources:[],topicStats:[],media:{},manifest:{}};
 const bank=process.env.MIR_TEST_BANK?JSON.parse(fs.readFileSync(process.env.MIR_TEST_BANK,'utf8')):fixture;
+test('a wrong answer can be classified and the cause survives a page recreation',async()=>{
+ const content=structuredClone(fixture);content.questions=content.questions.slice(0,1);const db=new IDBFactory();let app=await boot(db,content);
+ app.click('[data-action="daily"]');await until(()=>app.w.document.querySelector('.options'));assert.equal(app.w.document.querySelector('.error-choice'),null);
+ app.click('[data-index="1"]');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.error-choice'));
+ app.click('[data-cause="calculation"]');await until(()=>app.w.document.querySelector('[data-cause="calculation"]').getAttribute('aria-pressed')==='true');
+ let s=await app.w.MIRStore.loadState();const id=s.attempts[0].id;assert.equal(s.errorReviews[id].cause,'calculation');const attempts=JSON.stringify(s.attempts);app.dom.window.close();
+ app=await boot(db,content);try{app.click('[data-view="progress"]');await until(()=>app.w.document.querySelector('.error-profile'));assert.match(app.w.document.querySelector('.error-profile').textContent,/1 · Fallé el cálculo/);s=await app.w.MIRStore.loadState();assert.equal(JSON.stringify(s.attempts),attempts);assert.deepEqual(app.errors,[]);}finally{app.dom.window.close();}
+});
+test('a delayed check presents an unattempted case without its solution and records the real interval',async()=>{
+ const content=structuredClone(fixture);content.questions=content.questions.slice(0,4);content.questions.forEach(q=>{q.learningConcept='delayed';q.transfer=true;});
+ const db=new IDBFactory();let app=await boot(db,content);const s=app.w.MIRCore.blank(),past=Date.now()-8*app.w.MIRCore.DAY;
+ s.attempts=[{id:'old',itemId:'q0',kind:'question',scored:true,correct:true,confidence:'sure',at:past,concept:'delayed',family:app.w.MIRCore.family(content.questions[0])}];await app.w.MIRStore.saveState(s);app.dom.window.close();
+ app=await boot(db,content);try{
+  app.click('[data-action="delayed-start"]');await until(()=>app.w.document.querySelector('.options'));assert.equal(app.w.document.querySelector('.correction'),null);assert.equal(app.w.document.querySelector('.recall-prompt'),null);
+  app.w.document.querySelector('#confidence').value='sure';app.click('[data-index="2"]');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.correction'));
+  const after=await app.w.MIRStore.loadState(),a=after.attempts.at(-1);assert.notEqual(a.itemId,'q0');assert.equal(a.retention.valid,true);assert.equal(a.retention.stageDays,7);assert.equal(a.retention.anchorAt,past);assert.ok(after.conceptExposures.delayed.at>=a.at);assert.deepEqual(app.errors,[]);
+ }finally{app.dom.window.close();}
+});
+test('newly recovered images appear in old sessions while their original non-scoring decision remains frozen',async()=>{
+ const content=structuredClone(fixture);content.questions=content.questions.slice(0,1);const q=content.questions[0];q.imageRequired=true;q.status='imagen_pendiente';q.flags=['imagen_pendiente_de_vincular'];q.eligible=false;
+ const db=new IDBFactory();let app=await boot(db,content);app.click('[data-view="bank"]');await until(()=>app.w.document.querySelector('[data-action="open-question"]'));app.click('[data-action="open-question"]');await until(()=>app.w.document.querySelector('.options'));app.click('[data-index="1"]');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.correction'));const before=await app.w.MIRStore.loadState(),frozen=JSON.stringify(before.sessions);app.dom.window.close();
+ q.images=['recovered'];q.flags=[];q.status='historico_documental';q.eligible=true;
+ app=await boot(db,content);try{app.click('[data-action="resume"]');await until(()=>app.w.document.querySelector('[data-media="recovered"]'));assert.match(app.w.document.querySelector('.observation-notice').textContent,/condición original sin puntuación/);const after=await app.w.MIRStore.loadState();assert.equal(after.attempts[0].scored,false);assert.equal(JSON.stringify(after.sessions),frozen);assert.deepEqual(app.errors,[]);}finally{app.dom.window.close();}
+});
 test('home displays an authored mnemonic and its transfer button records assisted practice',async()=>{
  const content=structuredClone(fixture),m={id:'memory-transfer',concept:'transfer',memoryCard:true,front:'Synthetic memory',mnemonic:'Memorable synthetic phrase',clue:'Specific clue',trap:'Specific trap',visual:[['Left','Right']],references:[]};
  content.flashcards=[m];content.questions.push({...content.questions[0],id:'variant',stem:'Different synthetic transfer case',learningConcept:'transfer',transfer:true,memory:m,optionExplanations:['Reason A','Reason B','Reason C','Reason D']});
@@ -23,8 +47,9 @@ async function boot(db,content=bank){
  const errors=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
  const dom=new JSDOM(fs.readFileSync(path.join(root,'docs/index.html'),'utf8'),{url:'https://local-test.invalid/',runScripts:'outside-only',virtualConsole:vc});
  const w=dom.window;w.indexedDB=db;w.MIR_PRIVATE_BANK=structuredClone(content);w.structuredClone=structuredClone;w.scrollTo=()=>{};w.confirm=()=>true;
- for(const name of ['core-v1','store-v1','print-v1','launcher','app-v1'])w.eval(fs.readFileSync(path.join(root,'docs',name+'.js'),'utf8'));
+ for(const name of ['core-v1','learning-v1','store-v1','print-v1','launcher','app-v1'])w.eval(fs.readFileSync(path.join(root,'docs',name+'.js'),'utf8'));
  await until(()=>w.document.querySelector('[data-action="daily"]'));
+ await until(()=>w.document.querySelector('#save-label').textContent!=='Guardando…');
  return{dom,w,errors,click:selector=>{const e=w.document.querySelector(selector);assert.ok(e,selector);e.click();}};
 }
 test('expanded lessons lead with specific reasoning, preserve source text and remain hidden before answering',async()=>{

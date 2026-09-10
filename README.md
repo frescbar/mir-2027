@@ -2,6 +2,14 @@
 
 Proyecto independiente de Cultura365. La web está en `https://mir-2027.vercel.app` y su raíz de despliegue es `docs`.
 
+## Versión 1.5.0 · Errores y recuerdo diferido
+
+El motivo principal de cada error se registra por elección del usuario: desconocimiento, confusión, lectura o cálculo. La clasificación se sincroniza y no modifica la puntuación. Las comprobaciones de recuerdo usan conceptos específicos y familias de preguntas no respondidas: esperan siete días desde el último estudio y, tras un resultado seguro, treinta días. Volver a ver el contenido reinicia el intervalo. Los ejercicios que solo cambian cifras no cuentan como familias nuevas.
+
+El corpus privado preparado contiene 3.298 preguntas, 48 casos didácticos originales, 953 recursos de imagen y 125 preguntas con explicación propia de todas sus opciones. Esta entrega añade 24 casos y recupera 19 paneles con guía de lectura. Corrige seis requisitos de imagen erróneos; siguen pendientes 60 imágenes y 3.173 ampliaciones completas. No se ha realizado revisión clínica externa.
+
+«Revisión y fuentes» muestra cobertura real, procedencia y referencias enlazadas. El inventario y el formulario de revisión independiente incluyen todo el banco. Las propuestas conservan la versión y no publican ni alteran claves por sí solas. `scripts/check-sources.py` genera una cola de diferencias de referencias, sin convertir cambios de página en recomendaciones médicas.
+
 ## Versión 1.3.1 · Recordatorios preparados
 
 «Para recordarlo» muestra la idea ya redactada cuando existe. En el resto de preguntas prepara un recordatorio extractivo con la respuesta atribuida a la fuente y frases completas seleccionadas del comentario de esa misma ficha. Conserva negaciones, condiciones, procedencia y la numeración original. Las preguntas en negativo y las incidencias mantienen su aviso; una clave cuestionada no se presenta como válida. Desaparecen la consigna de cerrar el comentario y el botón «Anotar mi idea clave» de ese apartado.

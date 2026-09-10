@@ -1,3 +1,15 @@
+# Verificación de MIR/27 1.5.0
+
+Fecha: 10 de septiembre de 2026.
+
+- 60 pruebas automatizadas pasan: registro de causas, combinación de cambios entre dispositivos, límites de 7/30 días, exclusión de familias vistas y sesiones en curso, invalidación por pistas, persistencia y llegada de imágenes a sesiones antiguas sin recalcular su puntuación.
+- 3.298 preguntas inventariadas; 125 con todas las alternativas redactadas, 35 con estructura de comparación y trampa; 48 casos originales en 12 conceptos. El resto de ampliaciones y toda revisión clínica externa siguen pendientes.
+- 19 paneles recuperados de documentos aportados, cotejados visualmente con enunciado y opciones y recortados completos, incluidas figuras compuestas por operaciones de dibujo PDF. Se registran documento, página, coordenadas y hash. Se corrigen seis falsas dependencias de imagen. Quedan 60 paneles no localizados.
+- Las claves, enunciados y opciones existentes se mantienen. Los cambios de datos son parches de campos con condición de versión; no se modifica el historial remoto. Las 953 imágenes se decodifican y todas sus referencias resuelven.
+- Las pruebas de interfaz usan datos y almacenamiento de prueba. La verificación del sitio público alcanza el acceso y la versión; no sustituye una sesión real dentro de la cuenta del propietario.
+
+---
+
 # Verificación de MIR/27 1.3.1
 
 Fecha: 9 de septiembre de 2026.

@@ -27,7 +27,7 @@ function boot(db,remote,{online=true,owner='alice',authenticated=true}={}){
   else throw new Error('Unexpected request '+url);
   return new Response(JSON.stringify(result));
  };
- for(const name of ['core-v1','store-v1'])w.eval(fs.readFileSync(path.join(root,name+'.js'),'utf8'));
+ for(const name of ['core-v1','learning-v1','store-v1'])w.eval(fs.readFileSync(path.join(root,name+'.js'),'utf8'));
  return{dom,w,S:w.MIRStore,setOnline(value){connected=value;},close(){dom.window.close();}};
 }
 async function prepare(app){
