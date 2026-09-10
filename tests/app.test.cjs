@@ -27,6 +27,34 @@ async function boot(db,content=bank){
  await until(()=>w.document.querySelector('[data-action="daily"]'));
  return{dom,w,errors,click:selector=>{const e=w.document.querySelector(selector);assert.ok(e,selector);e.click();}};
 }
+test('expanded lessons lead with specific reasoning, preserve source text and remain hidden before answering',async()=>{
+ const content=structuredClone(fixture);content.questions=content.questions.slice(0,1);const q=content.questions[0];
+ q.explanation='A new editorial reasoning';q.teachingReview={date:'2026-09-10',method:'Synthetic test',sources:[{title:'Reference',url:'https://example.com/reference'}]};q.optionTeaching=q.options.map(optionText=>({optionText,reason:'Reason '+optionText,contrast:'Contrast '+optionText,pitfall:'Trap '+optionText}));
+ const app=await boot(new IDBFactory(),content);try{
+  app.click('[data-view="ampliaciones"]');await until(()=>app.w.document.querySelector('.bank-row'));assert.equal(app.w.document.querySelectorAll('.bank-row').length,1);assert.ok(!app.w.document.querySelector('#main').textContent.includes(q.explanation));
+  app.click('[data-action="open-question"]');await until(()=>app.w.document.querySelector('.options'));assert.equal(app.w.document.querySelector('.editorial-reasoning'),null);
+  app.click('[data-index="1"]');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.editorial-reasoning'));
+  assert.match(app.w.document.querySelector('.editorial-reasoning').textContent,/A new editorial reasoning/);assert.equal(app.w.document.querySelectorAll('.option-teaching').length,4);assert.equal(app.w.document.querySelectorAll('.option-reason[open]').length,2);assert.equal(app.w.document.querySelector('.historical-commentaries details').open,false);assert.match(app.w.document.querySelector('.historical-commentaries').textContent,/Explicación de prueba/);
+  const s=await app.w.MIRStore.loadState(),session=Object.values(s.sessions)[0];assert.equal(s.attempts[0].selected,1);assert.equal(s.preferences.dailySize,10);
+  const printed=await app.w.MIRPrint.build(session,()=>q,async()=>null,{solutions:true});assert.match(printed,/A new editorial reasoning/);assert.match(printed,/Contrast B/);assert.match(printed,/https:\/\/example.com\/reference/);assert.deepEqual(app.errors,[]);
+ }finally{app.dom.window.close();}
+});
+test('shared excerpts and missing individual reasons do not repeat the whole source under alternatives',async()=>{
+ const content=structuredClone(fixture);content.questions=content.questions.slice(0,1);const q=content.questions[0],text='A shared comparison of the first two alternatives.';q.optionEvidence=[{optionIndex:0,text},{optionIndex:1,text}];
+ const app=await boot(new IDBFactory(),content);try{
+  app.click('[data-action="daily"]');await until(()=>app.w.document.querySelector('.options'));app.click('.option');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.correction'));
+  const correction=app.w.document.querySelector('.correction');assert.equal(correction.querySelectorAll('.shared-evidence blockquote').length,1);assert.equal(correction.querySelectorAll('.option-reason').length,0);assert.match(correction.querySelector('.pending-options').textContent,/C · D/);
+  const s=await app.w.MIRStore.loadState();const html=await app.w.MIRPrint.build(Object.values(s.sessions)[0],()=>q,async()=>null,{solutions:true});assert.equal(html.split(text).length-1,1);assert.deepEqual(app.errors,[]);
+ }finally{app.dom.window.close();}
+});
+test('a completed session receives teaching updates without changing its frozen question or recorded answer',async()=>{
+ const content=structuredClone(fixture);content.questions=content.questions.slice(0,1);const db=new IDBFactory();let app=await boot(db,content);
+ app.click('[data-action="daily"]');await until(()=>app.w.document.querySelector('.options'));app.click('[data-index="1"]');app.click('[data-action="answer"]');await until(()=>app.w.document.querySelector('.correction'));let s=await app.w.MIRStore.loadState();const before=JSON.stringify(s.attempts),snapshot=JSON.stringify(Object.values(s.sessions)[0].items);app.dom.window.close();
+ const q=content.questions[0];q.explanation='Updated lesson for an old session';q.teachingReview={date:'2026-09-10',method:'Synthetic',sources:[]};q.optionTeaching=q.options.map(optionText=>({optionText,reason:'Updated '+optionText,contrast:'Context '+optionText,pitfall:'Trap '+optionText}));
+ app=await boot(db,content);try{
+  app.click('[data-action="daily"]');await until(()=>app.w.document.querySelector('.editorial-reasoning'));assert.match(app.w.document.querySelector('.editorial-reasoning').textContent,/Updated lesson for an old session/);s=await app.w.MIRStore.loadState();assert.equal(JSON.stringify(s.attempts),before);assert.equal(JSON.stringify(Object.values(s.sessions)[0].items),snapshot);assert.deepEqual(app.errors,[]);
+ }finally{app.dom.window.close();}
+});
 test('study, correction and persistence across page recreation',async()=>{
  const db=new IDBFactory();let app=await boot(db);
  try{

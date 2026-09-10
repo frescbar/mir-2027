@@ -37,3 +37,12 @@ test('alternative explanations distinguish authored, source evidence and full-ca
  assert.equal(C.optionReason(x,1).kind,'context');assert.equal(C.optionReason(x,1).text,x.commentary);
  const shuffled={...x,options:['C','B','A','D'],optionExplanations:[],optionEvidence:[{optionIndex:0,text:'C still follows identity'}]};assert.equal(C.optionReason(shuffled,0).evidence[0].text,'C still follows identity');
 });
+test('one passage shared by several alternatives is emitted once with all option identities',()=>{
+ const x=q('shared'),text='The source compares A with B in the same paragraph.';
+ x.optionEvidence=[{optionIndex:0,text},{optionIndex:1,text:'  '+text+'  '},{optionIndex:1,text}];
+ const d=C.optionDiscussion(x);assert.equal(d.shared.length,1);assert.deepEqual(d.shared[0].indices,[0,1]);assert.equal(d.reasons[0].evidence.length,0);assert.equal(d.reasons[1].evidence.length,0);assert.deepEqual(d.pending,[2,3]);
+});
+test('structured teaching cannot follow a changed option identity',()=>{
+ const x=q('identity');x.optionTeaching=[{optionText:'A',reason:'Why A',contrast:'When A',pitfall:'Trap A'}];x.optionExplanations=['Legacy A'];
+ assert.equal(C.optionReason(x,0).sections.reason,'Why A');x.options[0]='Changed';assert.notEqual(C.optionReason(x,0).kind,'authored');
+});

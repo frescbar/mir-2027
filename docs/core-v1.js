@@ -1,7 +1,7 @@
 /* MIR/27 1.0 · deterministic learning logic, independent of UI and network. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.MIRCore=api;})(globalThis,function(){
 'use strict';
-const DAY=86400000,VERSION='1.4.0';
+const DAY=86400000,VERSION='1.4.1';
 const copy=x=>JSON.parse(JSON.stringify(x));
 function hash(s){let h=2166136261;for(const c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;}
 function shuffled(a,seed){let n=hash(seed),out=[...a];const r=()=>{n+=0x6D2B79F5;let t=n;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;};for(let i=out.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;}
@@ -88,7 +88,9 @@ function recall(q){
 
 // Keep provenance and uncertainty visible: lexical matches are excerpts, never authored refutations.
 function optionReason(q,i){
- const authored=q.optionExplanations?.[i];if(typeof authored==='string'&&authored.trim())return{kind:'authored',text:authored,evidence:[]};
+ const teaching=q.optionTeaching?.[i];
+ if(teaching?.optionText===q.options?.[i]&&['reason','contrast','pitfall'].every(k=>typeof teaching[k]==='string'&&teaching[k].trim()))return{kind:'authored',text:[teaching.reason,'Cómo distinguirla: '+teaching.contrast,'Trampa de examen: '+teaching.pitfall].join('\n\n'),sections:teaching,evidence:[]};
+ const authored=(!teaching||teaching.optionText===q.options?.[i])?q.optionExplanations?.[i]:null;if(typeof authored==='string'&&authored.trim())return{kind:'authored',text:authored,evidence:[]};
  const clean=x=>String(x||'').replace(/\s+/g,' ').trim(),norm=x=>clean(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const evidence=(q.optionEvidence||[]).filter(e=>e.optionIndex===i&&clean(e.text));
  if(evidence.length)return{kind:'excerpt',text:'',evidence};
@@ -104,6 +106,14 @@ function optionReason(q,i){
  candidates.sort((a,b)=>b.hits-a.hits);
  if(candidates.length)return{kind:'related-excerpt',text:'',evidence:[candidates[0]]};
  return{kind:'context',text:clean(q.commentary||q.explanation||q.sourceCommentaries?.[0]?.text),evidence:[]};
+}
+// A source passage comparing several choices is shown once, never counted as several authored explanations.
+function optionDiscussion(q){
+ const reasons=(q.options||[]).map((_,i)=>optionReason(q,i)),passages=new Map();
+ const key=t=>String(t||'').replace(/\s+/g,' ').trim().toLowerCase();
+ reasons.forEach((r,i)=>r.evidence.forEach(e=>{const k=key(e.text);if(!passages.has(k))passages.set(k,{...e,indices:[]});const p=passages.get(k);if(!p.indices.includes(i))p.indices.push(i);}));
+ const shared=[...passages.values()].filter(p=>p.indices.length>1);
+ return{shared,pending:reasons.flatMap((r,i)=>r.kind==='context'?[i]:[]),reasons:reasons.map(r=>({...r,evidence:r.evidence.filter(e=>passages.get(key(e.text)).indices.length===1),shared:shared.filter(p=>r.evidence.some(e=>key(e.text)===key(p.text))).map(p=>shared.indexOf(p))}))};
 }
 function conceptKey(q){return q.learningConcept||q.memory?.concept||((q.concept&&!/^Tema\s/i.test(q.concept))?q.concept:(q.subject||'Sin clasificar')+' · '+(q.topic||q.concept||q.id));}
 function conceptProgress(bank,s,now=Date.now()){
@@ -187,5 +197,5 @@ function finish(s,session,lookup){if(session.status==='complete')return;session.
 function score(session){let correct=0,wrong=0,blank=0;session.items.slice(0,session.mainCount??session.items.length).forEach((x,i)=>{if(x.kind!=='question'||!itemScored(x))return;const a=session.answers[i],key=x.answerKey??x.data?.answer;if(!Number.isInteger(key))return;if(a?.selected==null)blank++;else if(a.selected===key)correct++;else wrong++;});return{correct,wrong,blank,total:correct+wrong+blank,raw:correct*3-wrong,net:correct-wrong/3};}
 function merge(a,b){a=normalize(a);b=normalize(b);const out=normalize((a.updatedAt||0)>=(b.updatedAt||0)?copy(a):copy(b));out.revision=Math.max(a.revision||0,b.revision||0);out.attempts=[...new Map([...a.attempts,...b.attempts].sort((x,y)=>(x.at||0)-(y.at||0)).map(x=>[x.id,x])).values()].sort((x,y)=>(x.at||0)-(y.at||0));const pick=(x,y)=>!x?y:!y?x:(x.updatedAt||x.lastAt||x.at||0)>=(y.updatedAt||y.lastAt||y.at||0)?x:y;for(const k of ['sessions','notes','marks','schedule','studySchedule','readPositions']){out[k]={};for(const id of new Set([...Object.keys(a[k]),...Object.keys(b[k])])){const x=a[k][id],y=b[k][id];let v=pick(x,y);if(k==='sessions'&&x&&y){v=copy(v);v.answers={};for(const ix of new Set([...Object.keys(x.answers||{}),...Object.keys(y.answers||{})]))v.answers[ix]=pick(x.answers[ix],y.answers[ix]);if(x.status==='complete'||y.status==='complete')v.status='complete';}out[k][id]=v;}}out.reports=[...new Map([...a.reports,...b.reports].map(x=>[x.id||x.itemId,x])).values()];return out;}
 function numeric(seed,type='nnt'){const r=shuffled([2,4,5,10],seed)[0],base=30,value=100/r,vals=shuffled([...new Set([value,r,base,100/(base-r),base+7])].slice(0,4),seed+'answers');return{id:'calc-'+hash(seed),kind:'question',origin:'Ejercicio matemático original · no pregunta oficial',status:'variante_matematica',subject:'Estadística y Epidemiología',topic:'NNT',concept:'nnt',stem:`Ejemplo ficticio: en el mismo periodo el riesgo del grupo control es ${base}% y el tratado ${base-r}%. ¿Cuál es el NNT?`,options:vals.map(x=>Number(x.toFixed(2)).toLocaleString('es-ES')+' pacientes'),answer:vals.indexOf(value),commentary:`La reducción absoluta del riesgo es ${base} − ${base-r} = ${r} puntos porcentuales, equivalentes a ${r/100}. NNT = 1 / RAR = 100 / ${r} = ${value}. No se utiliza directamente el riesgo del grupo control ni el del tratado: se utiliza su diferencia absoluta. El NNT se refiere al periodo de seguimiento que comparten ambos grupos.`,references:[],images:[],imageRequired:false};}
-return{VERSION,DAY,copy,hash,shuffled,uid,dayKey,blank,normalize,valid,eligible,studyable,observations,hasObservations,recall,optionReason,conceptKey,conceptProgress,conceptQuestions,memoryOfDay,itemScored,selectionPool,studyLatest,studySchedule,latest,stats,scheduleFor,markFor,uniqueQuestions,selectQuestions,selectDaily,makeSession,answer,finish,score,merge,numeric};
+return{VERSION,DAY,copy,hash,shuffled,uid,dayKey,blank,normalize,valid,eligible,studyable,observations,hasObservations,recall,optionReason,optionDiscussion,conceptKey,conceptProgress,conceptQuestions,memoryOfDay,itemScored,selectionPool,studyLatest,studySchedule,latest,stats,scheduleFor,markFor,uniqueQuestions,selectQuestions,selectDaily,makeSession,answer,finish,score,merge,numeric};
 });

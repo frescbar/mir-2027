@@ -88,3 +88,10 @@ El guardado local utiliza IndexedDB. Se recomienda exportar copias; el historial
 - El recordatorio diario con el enlace está configurado como automatización independiente, por la mañana en Europe/Madrid. No envía el banco ni las soluciones por correo y no requiere SMTP en la app.
 - La biblioteca original incluye archivos parcialmente extraíbles; no se afirma cobertura íntegra de todos los documentos.
 - No se comparte banco, repositorio ni progreso con Cultura365.
+# 1.4.1 · Explicaciones por alternativa
+
+La corrección admite una ampliación didáctica fechada, con referencias, razonamiento de cada alternativa, contraste y trampa de examen. La clave y la elección se abren al corregir; el comentario documental permanece accesible. La ruta `#ampliaciones` muestra las preguntas con este formato, con soluciones ocultas hasta responder.
+
+Los pasajes documentales compartidos se agrupan una sola vez. Las alternativas aún sin ampliación se identifican juntas, sin repetir bajo cada una el comentario completo. El contenido nuevo se sirve desde el banco privado; no se publica en este repositorio.
+
+La ampliación puede aparecer al revisar una sesión guardada si enunciado, opciones y clave coinciden. No modifica respuestas, puntuación ni instantáneas. El formato de impresión conserva las ampliaciones presentes en la instantánea de su sesión.

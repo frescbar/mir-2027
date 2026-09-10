@@ -103,3 +103,8 @@ El banco y el progreso requieren membresía. El repositorio de código seguía p
 - La nueva medición agrupa por concepto y asignatura, requiere dos preguntas distintas acertadas con seguridad en días separados por al menos siete días, y no declara dominio validado.
 - Las imágenes recuperadas conservan cuadernillo, página, número y correspondencia comprobada con el texto del examen. Se mantienen las sesiones antiguas y sus reglas de puntuación.
 - La revisión clínica global del banco y la recuperación de todas las imágenes siguen incompletas. La revisión del flujo autenticado de producción no se ha realizado sin acceso a la cuenta del usuario.
+# Verificación 1.4.1 · 10 de septiembre de 2026
+
+- 50 pruebas automatizadas superadas: razonamiento estructurado, identidad de opciones, agrupación de extractos, impresión, acceso posterior a responder y conservación de sesiones y puntuación.
+- La actualización del banco privado conserva enunciados, claves, comentarios documentales, imágenes y todos los registros ajenos al lote editorial.
+- El contenido didáctico es una elaboración con referencias y fecha. No se atribuye revisión clínica externa ni cobertura clínica integral al banco.
