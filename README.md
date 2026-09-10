@@ -1,5 +1,7 @@
 # MIR/27 · Entrenamiento personal
 
+La comprobación semanal de las 22 referencias enlazadas está activada. Registra cambios pendientes de contraste clínico y avisa al propietario; no cambia respuestas ni aprueba contenido.
+
 Proyecto independiente de Cultura365. La web está en `https://mir-2027.vercel.app` y su raíz de despliegue es `docs`.
 
 ## Versión 1.5.0 · Errores y recuerdo diferido

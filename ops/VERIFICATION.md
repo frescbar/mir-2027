@@ -1,5 +1,7 @@
 # Verificación de MIR/27 1.5.0
 
+La comprobación semanal de las 22 referencias enlazadas está activada. Registra cambios pendientes de contraste clínico y avisa al propietario; no cambia respuestas ni aprueba contenido.
+
 Fecha: 10 de septiembre de 2026.
 
 - 60 pruebas automatizadas pasan: registro de causas, combinación de cambios entre dispositivos, límites de 7/30 días, exclusión de familias vistas y sesiones en curso, invalidación por pistas, persistencia y llegada de imágenes a sesiones antiguas sin recalcular su puntuación.
