@@ -43,7 +43,7 @@ function render(ctx){
   if(filter==='unseen')pool=pool.filter(q=>!attempted.has(q.id));
   else if(filter==='failed')pool=pool.filter(q=>last.get(q.id)?.correct===false);
   else if(filter==='doubt')pool=pool.filter(q=>{const a=last.get(q.id);return a?.correct===true&&a.confidence!=='sure';});
-  pool=pool.filter(q=>C.studyable(q)&&Number.isInteger(q.answer)&&q.options.length===4);
+  pool=pool.filter(q=>C.studyable(q)&&(Number.isInteger(q.answer)||q.isAnnulled===true)&&q.options.length===4);
   if(ord==='random')pool=C.shuffled(pool,'mir-original-'+Date.now());
   else pool.sort(sorted);
   if(!pool.length)return toast('No hay preguntas disponibles con esos filtros. Modifica la selección.');
