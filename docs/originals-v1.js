@@ -23,6 +23,10 @@ function render(ctx){
  '<p class="small muted">Las preguntas anuladas o pendientes de verificar se indican en pantalla y no computan en las netas. Las que requieren una imagen no vinculada quedan señaladas.</p>'+
  '<button class="primary" type="submit">Comenzar mi sesión</button></form></section>';
  if(all.length) html+='<section class="card"><h3>Aprender de cada respuesta</h3><p>Tras contestar encontrarás la explicación de la fuente, el análisis disponible de las opciones, la imagen clínica si está vinculada y el enlace a la videoclase de Mediplus. También puedes guardar la pregunta para repasar.</p></section>';
+ const cards=Object.entries(state.notes||{}).filter(([id,v])=>id.startsWith('original-card:')&&v&&typeof v==='object'&&v.front);
+ html+='<section class="card"><h3>Mis fichas · '+cards.length+'</h3><p>Las fichas guardadas al corregir las preguntas se conservan en tu cuenta.</p>'+
+ (cards.length?cards.slice().reverse().map(([key,v])=>'<details class="sourcebox"><summary>'+esc(v.front)+'</summary><p>'+esc(v.back||'')+'</p><p class="small muted">'+esc(v.questionId||'')+'</p></details>').join(''):'<p class="small muted">Todavía no has guardado fichas.</p>')+'</section>';
+
  shell('MIR originales 2025–2026',html,'Practicar los exámenes originales, con sesiones a tu medida.');
  const form=document.getElementById('mir-original-form');
  form.querySelectorAll('[data-original-count]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();document.getElementById('mir-o-count').value=b.dataset.originalCount;}));
