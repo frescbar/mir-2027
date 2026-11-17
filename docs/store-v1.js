@@ -1,7 +1,7 @@
 /* MIR/27: private cloud storage + explicit local mode. No service-role keys. */
 (()=>{'use strict';
 const API='https://baplujcmcrqnjyarkere.supabase.co',KEY='sb_publishable_Gj5hyMV4ovSFdBUNp2p0nQ_J_ja4PV_',AUTH='mir27.auth.v1',LEGACY='sb-baplujcmcrqnjyarkere-auth-token';
-const localMode=!!window.MIR_PRIVATE_BANK;let auth=null,role=null,revision=0,queue=Promise.resolve(),refreshPromise=null,dbPromise=null;const images=new Map();
+const localMode=!!window.MIR_PRIVATE_BANK;let auth=null,role=null,confirmed=null,queue=Promise.resolve(),refreshPromise=null,dbPromise=null;const images=new Map();
 let offlineMode=false,offlinePacket=null,pending=false,lastSync=0;
 function sessionLoad(){if(localMode)return null;try{const v=JSON.parse(localStorage.getItem(AUTH)||localStorage.getItem(LEGACY)||'null');return v?.access_token?v:null;}catch{return null;}}
 auth=sessionLoad();
@@ -35,7 +35,7 @@ async function refresh(){if(refreshPromise)return refreshPromise;if(!auth?.refre
 async function ensureAuth(){if(localMode)return;if(!auth?.access_token)throw new Error('Inicia sesión para acceder al banco privado.');if((auth.expires_at||0)*1000<Date.now()+45000)await refresh();}
 async function signIn(email,password){offlineMode=false;offlinePacket=null;images.clear();const s=await request('/auth/v1/token?grant_type=password',{method:'POST',body:{email:email.trim(),password},bearer:false});persistAuth(s);setRecovery(false);await membership();return auth.user;}
 async function membership(){if(localMode){role='local';return role;}await ensureAuth();const m=await request('/rest/v1/app_members?select=role&user_id=eq.'+encodeURIComponent(auth.user.id));if(!m?.[0]){const error=new Error('La cuenta no tiene acceso autorizado a MIR/27.');error.status=403;throw error;}role=m[0].role;return role;}
-async function signOut(){const owner=auth?.user?.id;try{await queue;}catch{}if(auth&&!offlineMode&&navigator.onLine!==false){try{await request('/auth/v1/logout',{method:'POST'});}catch{}}persistAuth(null);setRecovery(false);role=null;images.clear();offlineMode=false;offlinePacket=null;pending=false;if(owner)await Promise.all(['offline-','cached-state-','backups-'].map(p=>idbDelete(p+owner).catch(()=>{})));}
+async function signOut(){const owner=auth?.user?.id;try{await queue;}catch{}confirmed=null;if(auth&&!offlineMode&&navigator.onLine!==false){try{await request('/auth/v1/logout',{method:'POST'});}catch{}}persistAuth(null);setRecovery(false);role=null;images.clear();offlineMode=false;offlinePacket=null;pending=false;if(owner)await Promise.all(['offline-','cached-state-','backups-'].map(p=>idbDelete(p+owner).catch(()=>{})));}
 function database(){if(!dbPromise)dbPromise=new Promise((resolve,reject)=>{const r=indexedDB.open('mir27.private.progress.v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('state');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(new Error('El navegador no permite almacenamiento local. Exporta tu progreso antes de cerrar.'));});return dbPromise;}
 async function idbGet(key){const db=await database();return new Promise((resolve,reject)=>{const r=db.transaction('state').objectStore('state').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 async function idbSet(key,v){const db=await database();return new Promise((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put(v,key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});}
@@ -46,32 +46,84 @@ function canFallback(error){return navigator.onLine===false||!error?.status;}
 async function cachedPacket(){if(!auth?.user?.id)return null;const packet=await idbGet('offline-'+auth.user.id).catch(()=>null);return packet?.owner===auth.user.id&&packet?.bank&&packet?.state?packet:null;}
 async function useOffline(){const packet=await cachedPacket();if(!packet)throw new Error('No hay una sesión descargada para esta cuenta. Conéctate para entrar y prepararla.');offlinePacket=packet;offlineMode=true;return packet;}
 async function loadBank(){if(localMode)return window.MIR_PRIVATE_BANK;if(offlineMode)return(offlinePacket||await useOffline()).bank;try{return assemble(await allRows('mir_content','kind,external_id,data'));}catch(e){if(!canFallback(e))throw e;return(await useOffline()).bank;}}
-async function loadState(){
+function enqueue(operation){
+ queue=queue.catch(()=>{}).then(operation);
+ return queue;
+}
+function loadState(){return enqueue(readState);}
+async function readState(){
  if(localMode)return MIRCore.normalize(await idbGet('local-progress'));
  const owner=auth?.user?.id;
- if(offlineMode||navigator.onLine===false){const packet=offlinePacket||await useOffline(),cached=await idbGet('cached-state-'+owner).catch(()=>null),dirty=await idbGet('pending-'+owner).catch(()=>null);pending=!!dirty;revision=Number(packet.state.revision||0);return MIRCore.merge(cached||packet.state,dirty||cached||packet.state);}
- try{await membership();const rows=await request('/rest/v1/user_state?select=state,revision&user_id=eq.'+encodeURIComponent(owner));revision=Number(rows?.[0]?.revision||0);let s=MIRCore.normalize(rows?.[0]?.state);s.revision=revision;const dirty=await idbGet('pending-'+owner).catch(()=>null);pending=!!dirty;if(dirty)s=MIRCore.merge(s,dirty);await idbSet('cached-state-'+owner,s).catch(()=>{});lastSync=Date.now();return s;}
- catch(e){if(!canFallback(e))throw e;await useOffline();return loadState();}
+ if(offlineMode||navigator.onLine===false){
+  const packet=offlinePacket||await useOffline(),cached=await idbGet('cached-state-'+owner).catch(()=>null),dirty=await idbGet('pending-'+owner).catch(()=>null);
+  pending=!!dirty;
+  return MIRCore.merge(cached||packet.state,dirty||cached||packet.state);
+ }
+ try{
+  await membership();
+  const rows=await request('/rest/v1/user_state?select=state,revision&user_id=eq.'+encodeURIComponent(owner));
+  const remote=MIRCore.normalize(rows?.[0]?.state);
+  remote.revision=Number(rows?.[0]?.revision||0);
+  // Keep the server snapshot and its revision together, isolated from UI edits.
+  confirmed={owner,state:MIRCore.copy(remote)};
+  const dirty=await idbGet('pending-'+owner).catch(()=>null);
+  pending=!!dirty;
+  const state=dirty?MIRCore.merge(dirty,remote):remote;
+  state.revision=remote.revision;
+  await idbSet('cached-state-'+owner,state).catch(()=>{});
+  lastSync=Date.now();
+  return state;
+ }catch(e){
+  if(!canFallback(e))throw e;
+  await useOffline();
+  return readState();
+ }
 }
 async function backupState(state){if(localMode)return;const owner=auth?.user?.id;if(!owner)return;const list=await idbGet('backups-'+owner)||[],now=Date.now();await idbSet('backups-'+owner,[{at:now,state:MIRCore.copy(state)},...list].slice(0,3));}
 async function listBackups(){return localMode||!auth?.user?.id?[]:await idbGet('backups-'+auth.user.id)||[];}
 function saveState(state){
  state.updatedAt=Date.now();const payload=MIRCore.copy(state),owner=auth?.user?.id;
- queue=queue.catch(()=>{}).then(async()=>{
+ return enqueue(async()=>{
   if(localMode){await idbSet('local-progress',payload);return payload;}
   if(!owner)throw new Error('Inicia sesión para guardar el progreso.');
-  const key='pending-'+owner;await idbSet(key,payload);pending=true;
-  if(offlineMode||navigator.onLine===false){offlinePacket=await cachedPacket();offlineMode=true;return payload;}
   if(auth?.user?.id!==owner)throw new Error('Vuelve a entrar con la cuenta de este progreso.');
-  let merged=payload;
+  const key='pending-'+owner, dirty=await idbGet(key);
+  let merged=dirty?MIRCore.merge(payload,dirty):payload;
+  await idbSet(key,merged);
+  pending=true;
+  if(offlineMode||navigator.onLine===false){offlinePacket=await cachedPacket();offlineMode=true;return merged;}
+
+  // This snapshot may have been queued before the latest read or accepted save.
+  const base=confirmed?.owner===owner?confirmed.state:null;
+  let revision=base?.revision||0;
+  if(base)merged=MIRCore.merge(merged,base);
   for(let i=0;i<4;i++){
-   let result;try{result=await request('/rest/v1/rpc/mir_save_state',{method:'POST',body:{p_expected_revision:revision,p_state:merged}});}catch(e){if(canFallback(e)&&await cachedPacket()){await useOffline();return merged;}throw e;}
+   merged.revision=revision;
+   let result;
+   try{
+    result=await request('/rest/v1/rpc/mir_save_state',{method:'POST',body:{p_expected_revision:revision,p_state:merged}});
+   }catch(e){
+    if(canFallback(e)&&await cachedPacket()){await useOffline();return MIRCore.copy(merged);}
+    throw e;
+   }
    revision=Number(result.revision);
-   if(result.ok){merged.revision=revision;await idbSet('cached-state-'+owner,merged);await idbDelete(key);pending=false;lastSync=Date.now();const backups=await listBackups().catch(()=>[]);if(!backups.length||Date.now()-backups[0].at>86400000)await backupState(merged).catch(()=>{});return merged;}
-   merged=MIRCore.merge(merged,result.state);await idbSet(key,merged);
+   if(result.ok){
+    merged.revision=revision;
+    confirmed={owner,state:MIRCore.copy(merged)};
+    await idbSet('cached-state-'+owner,merged);
+    await idbDelete(key);
+    pending=false;
+    lastSync=Date.now();
+    const backups=await listBackups().catch(()=>[]);
+    if(!backups.length||Date.now()-backups[0].at>86400000)await backupState(merged).catch(()=>{});
+    return merged;
+   }
+   merged=MIRCore.merge(merged,result.state);
+   merged.revision=revision;
+   await idbSet(key,merged);
   }
   throw new Error('Otro dispositivo está guardando cambios. Reintenta; tu copia local permanece intacta.');
- });return queue;
+ });
 }
 async function media(id){if(localMode)return window.MIR_PRIVATE_BANK.media?.[id]||null;if(images.has(id))return images.get(id);if(offlineMode)return offlinePacket?.media?.[id]||null;const rows=await request('/rest/v1/mir_media?select=data&external_id=eq.'+encodeURIComponent(id)+'&limit=1');const v=rows?.[0]?.data||null;if(v){if(images.size>80)images.delete(images.keys().next().value);images.set(id,v);}return v;}
 async function mediaCatalog(){
