@@ -5,7 +5,7 @@ const C=MIRCore,L=MIRLearning,S=MIRStore,$=s=>document.querySelector(s),main=$('
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tidy=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase();
 let bank=null,state=null,index=new Map(),ready=false,busy=false,currentSession=null,enteredKey='',enteredAt=0,importPayload=null,importing=false;
-let syncInFlight=false,lastSyncCheck=0;
+let syncInFlight=false,lastSyncCheck=0,localSaves=0;
 const syncClock=()=>new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(S.lastSync||Date.now()));
 const WEB='https://mir-2027.vercel.app';const importNonce=new URLSearchParams(location.hash.slice(1)).get('import');
 const filters={text:'',subject:'',year:'',status:'all',images:false,favorites:false,page:0};let readingFilter='',readingPage=0,atlasPage=0,atlasScope='all',atlasSearch='',atlasMetadata=null,atlasRequest=0,atlasMode='';
@@ -22,7 +22,7 @@ function shell(title,body,sub=''){main.innerHTML=heading(title,sub)+body;$('#nav
 function button(action,text,cls='ghost',extra=''){return`<button class="${cls}" data-action="${action}" ${extra}>${text}</button>`;}
 function renderNav(){const allowed=ready&&!S.recovering;$('#nav').innerHTML=allowed?navItems.map(([id,name])=>`<button data-view="${id}" class="${route()===id?'active':''}">${name}</button>`).join(''):'';$('#logout').hidden=S.local||!S.user;$('#mode').textContent=S.local?'LOCAL · PRIVADO':S.offline?'SESIÓN SIN CONEXIÓN':'WEB · ACCESO PRIVADO';}
 function applyPrefs(){document.documentElement.style.setProperty('--reader-scale',String(state?.preferences.fontScale||1));document.documentElement.classList.toggle('focus-mode',!!state?.preferences.focus);}
-async function save(){if(!state)return;$('#save-label').textContent='Guardando…';try{const next=await S.saveState(state);state=C.merge(state,next);$('#save-label').textContent=S.local?'Guardado en este dispositivo':S.pending?'Guardado aquí · pendiente de sincronizar':'Sincronizado · '+syncClock();}catch(e){$('#save-label').textContent='Cambios pendientes de sincronizar';toast(e.message);}}
+async function save(){if(!state)return;localSaves++;$('#save-label').textContent='Guardando…';try{const next=await S.saveState(state);state=C.merge(state,next);$('#save-label').textContent=S.local?'Guardado en este dispositivo':S.pending?'Guardado aquí · pendiente de sincronizar':'Sincronizado · '+syncClock();}catch(e){$('#save-label').textContent='Cambios pendientes de sincronizar';toast(e.message);}}
 function refs(d){const list=d.references||[];if(!list.length)return`<p class="muted small">${d.origin?.includes('original')?'Elaboración original; no se atribuye a un examen oficial.':'La ficha no especifica una referencia de página.'}</p>`;return`<details class="sources"><summary>Fuentes y página exacta (${list.length})</summary>${list.map(r=>`<p><strong>${esc(r.title||r.id||'Documento')}</strong>${r.pdfPage?` · PDF p. ${esc(r.pdfPage)}${r.pdfPageEnd&&r.pdfPageEnd!==r.pdfPage?'–'+esc(r.pdfPageEnd):''}`:''}${r.printedPage?` · impresa p. ${esc(r.printedPage)}`:''}${r.yearLabel?` · rótulo ${esc(r.yearLabel)}`:''}<br><span class="muted small">${esc(r.file||'')}</span>${r.url&&/^https:\/\//.test(r.url)?` <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Abrir referencia</a>`:''}${S.local&&r.file&&bank.sources.some(x=>x.id===r.id&&x.originalIncluded)?` <a href="./biblioteca_originales/${encodeURIComponent(r.file)}${r.pdfPage?'#page='+encodeURIComponent(r.pdfPage):''}" target="_blank" rel="noopener">Abrir original en el paquete local</a>`:''}</p>`).join('')}</details>`;}
 function paragraph(t){return`<div class="source-text">${esc(t)}</div>`;}
 function correction(q,a,scored=C.eligible(q),attemptId=null){
@@ -133,13 +133,15 @@ async function syncOnReturn(force=false){
  syncInFlight=true;lastSyncCheck=Date.now();
  $('#save-label').textContent='Comprobando progreso…';
  try{
-  await S.waitForWrites();
+  const beforeSave=localSaves,beforeSession=currentSession;
   const fresh=await S.loadState();
   const newRevision=Number(fresh.revision||0)>Number(state.revision||0);
   state=C.merge(state,fresh);
   if(newRevision){
    const remoteId=fresh.activeSession,remoteSession=fresh.sessions?.[remoteId];
-   if(route()==='session'&&remoteSession?.status==='active')currentSession=remoteId;
+   if(route()==='session'&&remoteSession?.status==='active'&&localSaves===beforeSave&&currentSession===beforeSession){
+    currentSession=remoteId;
+   }
    else if(currentSession&&!state.sessions[currentSession])currentSession=null;
    render();
    toast('Progreso actualizado desde tu cuenta.');
